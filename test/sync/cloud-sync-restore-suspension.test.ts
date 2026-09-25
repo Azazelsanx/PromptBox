@@ -62,7 +62,7 @@ describe('CloudSyncService restore suspensions', () => {
     const storage = new MemoryStorage()
     const emptyData = {
       categories: [], prompts: [], promptVariables: [], promptHistories: [], aiConfigs: [],
-      quickOptimizationConfigs: [], aiHistory: [], settings: [], syncTombstones: []
+      quickOptimizationConfigs: [], aiHistory: [], settings: [], bots: [], syncTombstones: []
     }
     const remoteData = {
       ...emptyData,

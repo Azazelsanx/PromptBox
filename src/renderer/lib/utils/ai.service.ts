@@ -39,7 +39,8 @@ export async function getAIModels(config: AIConfig): Promise<string[]> {
   }
   
   try {
-    return await window.electronAPI.ai.getModels(config);
+    const result = await window.electronAPI.ai.getModels(config);
+    return result.models ?? [];
   } catch (error) {
     return [];
   }

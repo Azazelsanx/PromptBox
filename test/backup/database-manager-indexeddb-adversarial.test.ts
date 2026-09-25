@@ -57,6 +57,14 @@ const STORE_DEFINITIONS: Record<string, StoreDefinition> = {
       key: { keyPath: 'key', unique: true }
     }
   },
+  bots: {
+    indexes: {
+      name: { keyPath: 'name', unique: false },
+      enabled: { keyPath: 'enabled', unique: false },
+      sortOrder: { keyPath: 'sortOrder', unique: false },
+      uuid: { keyPath: 'uuid', unique: true }
+    }
+  },
   syncTombstones: {
     indexes: {}
   }
@@ -76,6 +84,7 @@ function emptyRestoreData() {
     quickOptimizationConfigs: [],
     aiHistory: [],
     settings: [],
+    bots: [],
     syncTombstones: []
   }
 }

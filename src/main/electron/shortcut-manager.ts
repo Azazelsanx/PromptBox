@@ -108,7 +108,7 @@ export class ShortcutManager {
     const duplicate = this.getAllConfiguredBindings().find(binding =>
       binding.enabled && binding.id !== excludeId && this.normalizeAccelerator(binding.accelerator).toLowerCase() === normalized
     );
-    if (duplicate) return { valid: false, error: '该快捷键已在 AI Gist 中使用' };
+    if (duplicate) return { valid: false, error: '该快捷键已在 PromptBox 中使用' };
     return { valid: true };
   }
 

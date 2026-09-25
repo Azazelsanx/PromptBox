@@ -18,7 +18,8 @@ export type CloudSyncCollectionName =
   | 'aiConfigs'
   | 'quickOptimizationConfigs'
   | 'aiHistory'
-  | 'settings';
+  | 'settings'
+  | 'bots';
 
 export interface CloudSyncDataSet {
   categories?: any[];
@@ -29,6 +30,7 @@ export interface CloudSyncDataSet {
   quickOptimizationConfigs?: any[];
   aiHistory?: any[];
   settings?: any[];
+  bots?: any[];
   syncTombstones?: CloudSyncTombstone[];
   [collection: string]: any[] | undefined;
 }
@@ -126,7 +128,8 @@ const DEFAULT_COLLECTIONS: CloudSyncCollectionName[] = [
   'aiConfigs',
   'quickOptimizationConfigs',
   'aiHistory',
-  'settings'
+  'settings',
+  'bots'
 ];
 
 const REQUIRED_SNAPSHOT_COLLECTIONS = [
@@ -143,6 +146,7 @@ const IDENTITY_FIELDS: Record<string, string[]> = {
   quickOptimizationConfigs: ['uuid', 'id'],
   aiHistory: ['uuid', 'historyId', 'id'],
   settings: ['key', 'id'],
+  bots: ['uuid', 'id'],
   syncTombstones: ['recordKey', 'recordUuid', 'id']
 };
 

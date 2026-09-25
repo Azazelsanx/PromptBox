@@ -46,6 +46,7 @@ const baseData = {
   quickOptimizationConfigs: [],
   aiHistory: [],
   settings: [],
+  bots: [],
   syncTombstones: []
 }
 
@@ -413,6 +414,7 @@ describe('CloudSyncService', () => {
       quickOptimizationConfigs: [],
       aiHistory: [],
       settings: [{ id: 1, key: 'theme', value: 'dark', type: 'string' }],
+      bots: [],
       syncTombstones: []
     }
     const localData = {
@@ -772,6 +774,7 @@ describe('CloudSyncService', () => {
           quickOptimizationConfigs: [],
           aiHistory: [],
           settings: [],
+          bots: [],
           syncTombstones: []
         }
       }),
@@ -1332,6 +1335,7 @@ describe('CloudSyncService', () => {
       quickOptimizationConfigs: [],
       aiHistory: [],
       settings: [],
+      bots: [],
       syncTombstones: []
     }
     const remoteSnapshot = createCloudSyncSnapshot(baseData, 'device-b', 'rev-remote')
@@ -2908,6 +2912,7 @@ describe('CloudSyncService', () => {
       quickOptimizationConfigs: [],
       aiHistory: [],
       settings: [],
+      bots: [],
       syncTombstones: []
     }
     const remoteSnapshot = createCloudSyncSnapshot(baseData, 'device-b', 'rev-remote')

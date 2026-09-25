@@ -149,6 +149,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     intelligentTest: (config: any) => ipcRenderer.invoke('ai:intelligent-test', config),
     stopGeneration: () => ipcRenderer.invoke('ai:stop-generation'),
     debugPrompt: (prompt: string, config: any) => ipcRenderer.invoke('ai:debug-prompt', prompt, config),
+    reversePrompt: (request: { config: any; instruction: string; imageDataUrl: string; model?: string; taskId?: string }) =>
+      ipcRenderer.invoke('ai:reverse-prompt', request),
+    cancelReverseTask: (taskId: string) => ipcRenderer.invoke('ai:cancel-reverse-task', taskId),
+    onReverseProgress: (callback: (payload: { taskId: string; partial: string }) => void) => {
+      const listener = (_: any, payload: { taskId: string; partial: string }) => callback(payload);
+      ipcRenderer.on('ai:reverse-progress', listener);
+      // 返回移除监听器的函数
+      return () => ipcRenderer.removeListener('ai:reverse-progress', listener);
+    }
   },
 
   // 快捷键管理

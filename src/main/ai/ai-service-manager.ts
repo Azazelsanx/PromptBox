@@ -5,6 +5,7 @@ import {
   AIConfigTestResult
 } from '@shared/types/ai';
 import { AIProviderFactory } from './providers/provider-factory';
+import { OpenAICompatibleProvider } from './providers/openai-provider';
 import { AITestResult, AIIntelligentTestResult } from './providers/base-provider';
 
 // 使用共享的 AIConfig 类型，添加一个别名用于处理后的配置
@@ -135,7 +136,7 @@ class AIServiceManager {
    * @param config 原始配置
    * @returns 模型列表
    */
-  async processGetModels(config: any): Promise<string[]> {
+  async processGetModels(config: any): Promise<{ models: string[]; modelSource: 'remote' | 'default' }> {
     // 将配置转换为内部格式
     const processedConfig = {
       ...config,
@@ -143,8 +144,15 @@ class AIServiceManager {
       createdAt: new Date(config.createdAt),
       updatedAt: new Date(config.updatedAt)
     };
-    
-    return await this.getAvailableModels(processedConfig);
+
+    const provider = AIProviderFactory.getProvider(processedConfig);
+    // OpenAI 兼容供应商能区分"远端真实列表"与"回退内置默认"，其他供应商拉到的即真实列表
+    if (provider instanceof OpenAICompatibleProvider) {
+      return await provider.getAvailableModelsWithSource(processedConfig);
+    }
+
+    const models = await this.getAvailableModels(processedConfig);
+    return { models, modelSource: 'remote' };
   }
 
   /**
@@ -170,8 +178,72 @@ class AIServiceManager {
       ...request,
       config: processedConfig
     };
-    
+
     return await this.generatePrompt(requestWithConfig);
+  }
+
+  /** 进行中的图片逆向任务（taskId → AbortController），支持渲染层取消 */
+  private activeReverseTasks = new Map<string, AbortController>();
+
+  /**
+   * 处理 Bot 图片逆向提示词请求（能力探测：实现 reversePromptFromImage 的供应商均支持）
+   * @param request 逆向请求（config 为原始配置对象；taskId 用于取消管理）
+   * @returns 生成的提示词与所用模型
+   */
+  async processReversePrompt(request: {
+    config: any;
+    instruction: string;
+    imageDataUrl: string;
+    model?: string;
+    taskId?: string;
+    onProgress?: (partial: string) => void;
+  }): Promise<{ prompt: string; model: string }> {
+    const processedConfig = {
+      ...request.config,
+      models: Array.isArray(request.config.models) ? request.config.models : [],
+      createdAt: new Date(request.config.createdAt),
+      updatedAt: new Date(request.config.updatedAt)
+    };
+
+    const provider = AIProviderFactory.getProvider(processedConfig);
+    // 能力探测：多模态供应商（OpenAI 兼容系 / LM Studio / Ollama 等）各自实现 reversePromptFromImage
+    if (typeof provider.reversePromptFromImage !== 'function') {
+      throw new Error(`当前供应商（${processedConfig.type}）暂不支持图片逆向提示词，请改用支持多模态的供应商（OpenAI / DeepSeek / 千问 / SiliconFlow / OpenRouter / LM Studio / Ollama 等）`);
+    }
+
+    const controller = new AbortController();
+    if (request.taskId) {
+      this.activeReverseTasks.set(request.taskId, controller);
+    }
+
+    try {
+      return await provider.reversePromptFromImage({
+        config: processedConfig,
+        instruction: request.instruction,
+        imageDataUrl: request.imageDataUrl,
+        model: request.model,
+        signal: controller.signal,
+        onProgress: request.onProgress
+      });
+    } finally {
+      if (request.taskId) {
+        this.activeReverseTasks.delete(request.taskId);
+      }
+    }
+  }
+
+  /**
+   * 取消进行中的图片逆向任务（渲染层通过 IPC 调用）
+   * @returns 是否找到并中止了任务
+   */
+  cancelReverseTask(taskId: string): boolean {
+    const controller = this.activeReverseTasks.get(taskId);
+    if (!controller) {
+      return false;
+    }
+    controller.abort();
+    this.activeReverseTasks.delete(taskId);
+    return true;
   }
 
   /**
@@ -179,8 +251,7 @@ class AIServiceManager {
    * @param config 原始配置
    * @returns 测试结果
    */
-  async processIntelligentTest(config: any): Promise<{ success: boolean; response?: string; error?: string; inputPrompt?: string }> {
-    // 将配置转换为内部格式
+  async processIntelligentTest(config: any): Promise<{ success: boolean; response?: string; error?: string; inputPrompt?: string }> {    // 将配置转换为内部格式
     const processedConfig = {
       ...config,
       models: Array.isArray(config.models) ? config.models : [],

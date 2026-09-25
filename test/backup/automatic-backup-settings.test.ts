@@ -87,13 +87,14 @@ describe('automatic backup settings', () => {
     await service.runNow('interval')
 
     expect(backupService.create).toHaveBeenCalledTimes(1)
-    // 不再在这里把某种语言的描述文案写死存进备份文件：备份列表标题由界面按
-    // backupType 现算并跟随当前界面语言，创建时只需要传 backupType 供界面识别。
-    expect(backupService.create).toHaveBeenCalledWith({
-      backupType: 'automatic',
-      trigger: 'interval',
-      retention: DEFAULT_AUTO_BACKUP_RETENTION
-    })
+    // create 的第一个参数必须带 description（本地备份服务契约）；
+    // 描述文案由 getDefaultLocalBackupDescription 按界面语言现算，不在此断言具体文字。
+    const createCall = backupService.create.mock.calls[0][0] as Record<string, unknown>
+    expect(createCall.backupType).toBe('automatic')
+    expect(createCall.trigger).toBe('interval')
+    expect(createCall.retention).toBe(DEFAULT_AUTO_BACKUP_RETENTION)
+    expect(typeof createCall.description).toBe('string')
+    expect((createCall.description as string).length).toBeGreaterThan(0)
     expect(service.getStatus()).toMatchObject({
       status: 'success',
       lastRunAction: 'created',

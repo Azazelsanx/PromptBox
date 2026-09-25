@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import type { PromptWithRelations, PromptVariable } from '../src/shared/types/database'
+import type { GlobalVariable, PromptWithRelations, PromptVariable } from '../src/shared/types/database'
 import {
+  applyGlobalLibraryDefinitions,
   createWorkspaceDraft,
   deriveWorkspaceVariables,
   getMissingRequiredVariables,
@@ -64,5 +65,71 @@ describe('prompt workspace rendering', () => {
 
     expect(deriveWorkspaceVariables(jinjaPrompt).map(item => item.name)).toEqual(['enabled', 'name'])
     expect(renderWorkspacePrompt(jinjaPrompt, { enabled: true, name: 'Codex' }).content).toBe('Hello Codex')
+  })
+})
+
+describe('applyGlobalLibraryDefinitions', () => {
+  const libraryVariable = (name: string, overrides: Partial<GlobalVariable> = {}): GlobalVariable => ({
+    uuid: `global-${name}`,
+    name,
+    type: 'text',
+    required: false,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  })
+
+  it('overrides local definitions when a same-name library variable exists', () => {
+    const local = [
+      variable('style', { type: 'text', required: true, defaultValue: 'plain' }),
+      variable('tone', { type: 'text', required: true }),
+    ]
+    const library = [
+      libraryVariable('style', {
+        type: 'select',
+        options: ['formal', 'casual'],
+        required: false,
+        defaultValue: 'casual',
+        placeholder: '选择语气',
+        description: '全局库语气定义',
+      }),
+    ]
+
+    const [style, tone] = applyGlobalLibraryDefinitions(local, library)
+    expect(style).toMatchObject({
+      name: 'style',
+      type: 'select',
+      options: ['formal', 'casual'],
+      required: false,
+      defaultValue: 'casual',
+      placeholder: '选择语气',
+      description: '全局库语气定义',
+      libraryLinked: true,
+      libraryUuid: 'global-style',
+    })
+    // 库中没有的变量保持本地定义，不标记
+    expect(tone).toMatchObject({ name: 'tone', type: 'text', required: true })
+    expect(tone.libraryLinked).toBeUndefined()
+  })
+
+  it('falls back to local fields when the library definition leaves them empty', () => {
+    const local = [variable('legacy', { type: 'str' as never, defaultValue: 'kept', options: ['a'], validation: { maxLength: 10 } })]
+    const library = [libraryVariable('legacy', { type: 'text', options: [] })]
+
+    const [merged] = applyGlobalLibraryDefinitions(local, library)
+    expect(merged).toMatchObject({
+      type: 'text',
+      // 库未设置默认值/校验时回落本地
+      defaultValue: 'kept',
+      validation: { maxLength: 10 },
+      libraryLinked: true,
+    })
+    // 库 options 为空时保留本地 options
+    expect(merged.options).toEqual(['a'])
+  })
+
+  it('returns variables untouched when the library is empty', () => {
+    const local = [variable('name')]
+    expect(applyGlobalLibraryDefinitions(local, [])).toEqual(local)
   })
 })

@@ -85,6 +85,7 @@ export function useAIConfigForm() {
       siliconflow: '硅基流动 API Key',
       tencent: '腾讯云 API Key',
       aliyun: '阿里云 API Key',
+      qianwen: '千问AI TokenPlan API Key',
       mistral: 'Mistral API Key',
       zhipu: '智谱AI API Key',
       openrouter: 'OpenRouter API Key'
@@ -122,6 +123,10 @@ export function useAIConfigForm() {
       aliyun: {
         label: '阿里云 API 地址',
         placeholder: getDefaultBaseURL('aliyun')
+      },
+      qianwen: {
+        label: '千问AI TokenPlan API 地址',
+        placeholder: getDefaultBaseURL('qianwen')
       },
       mistral: {
         label: 'Mistral API 地址',

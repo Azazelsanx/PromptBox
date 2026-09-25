@@ -99,12 +99,15 @@ export default interface ElectronApi {
     removeConfig: (id: string) => Promise<boolean>
     testConfig: (config: AIConfig) => Promise<AIConfigTestResult>
     testModel: (config: AIConfig, model: string) => Promise<{ success: boolean; error?: string; model?: string; response?: string }>
-    getModels: (config: AIConfig) => Promise<string[]>
+    getModels: (config: AIConfig) => Promise<{ models: string[]; modelSource: 'remote' | 'default' }>
     generatePrompt: (request: AIGenerationRequest, config: AIConfig) => Promise<AIGenerationResult>
     generatePromptStream: (request: AIGenerationRequest, config: AIConfig, onProgress: (charCount: number, partialContent?: string) => boolean) => Promise<AIGenerationResult>
     intelligentTest: (config: AIConfig) => Promise<AIConfigTestResult>
     stopGeneration: () => Promise<{ success: boolean; message: string }>
     debugPrompt: (prompt: string, config: AIConfig) => Promise<AIGenerationResult>
+    reversePrompt: (request: { config: AIConfig; instruction: string; imageDataUrl: string; model?: string; taskId?: string }) => Promise<{ prompt: string; model: string }>
+    cancelReverseTask: (taskId: string) => Promise<boolean>
+    onReverseProgress: (callback: (payload: { taskId: string; partial: string }) => void) => () => void
   }
 
   data: {

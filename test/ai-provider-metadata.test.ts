@@ -20,6 +20,7 @@ const providerTypes: AIProviderType[] = [
   'tencent',
   'aliyun',
   'zhipu',
+  'qianwen',
   'openrouter'
 ]
 
@@ -34,6 +35,12 @@ describe('AI provider metadata', () => {
 
   it('uses Tencent TokenHub as the default Tencent endpoint', () => {
     expect(getDefaultBaseURL('tencent')).toBe('https://tokenhub.tencentmaas.com/v1')
+  })
+
+  it('uses the Qianwen AI TokenPlan OpenAI-compatible endpoint', () => {
+    expect(getDefaultBaseURL('qianwen')).toBe('https://token-plan.maas.qianwenaiapi.com/compatible-mode/v1')
+    expect(getDefaultModels('qianwen')).toEqual(['qwen3.8-max', 'qwen3.7-plus', 'qwen3.8-flash', 'qwen-vl-max', 'qwen-vl-plus'])
+    expect(getTestModelPriority('qianwen')[0]).toBe('qwen3.8-flash')
   })
 
   it('keeps OpenAI defaults on current GPT-5 generation models', () => {

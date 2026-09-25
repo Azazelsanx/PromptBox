@@ -118,8 +118,12 @@
                             <NScrollbar class="category-list">
                                 <button v-for="category in categories" :key="category.id" type="button"
                                     class="category-item" :class="{ active: activeFilter === `category:${category.id}` }"
-                                    @click="selectNavigation(`category:${category.id}`)">
-                                    <span class="category-dot" :style="{ backgroundColor: category.color || 'var(--content-tertiary)' }" />
+                                    @click="selectNavigation(`category:${category.id}`)"
+                                    @contextmenu.prevent="openCategoryMenu($event, category)">
+                                    <component v-if="resolveIcon(category.icon)" :is="resolveIcon(category.icon)"
+                                        class="category-item-icon" :theme="category.iconTheme || 'outline'" :size="14"
+                                        :fill="category.color || undefined" />
+                                    <span v-else class="category-dot" :style="{ backgroundColor: category.color || 'var(--content-tertiary)' }" />
                                     <span class="category-name">{{ category.name }}</span>
                                     <span class="nav-count">{{ categoryCounts.get(category.id) || 0 }}</span>
                                 </button>
@@ -128,19 +132,25 @@
                     </section>
                 </template>
         </NSplit>
+
+        <!-- 分类右键菜单：常用操作（编辑 / 删除） -->
+        <NDropdown trigger="manual" :show="categoryMenu.show" :x="categoryMenu.x" :y="categoryMenu.y"
+            placement="bottom-start" :options="categoryMenuOptions"
+            @select="handleCategoryMenuSelect" @clickoutside="categoryMenu.show = false" />
     </aside>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NCollapseTransition, NDropdown, NEmpty, NFlex, NIcon, NInput, NScrollbar, NSplit, NSpin, NTag, NText, NTooltip } from 'naive-ui'
 import {
-    ArrowsSort, Check, ChevronDown, Clock, ListDetails, Search, Settings, Star
+    ArrowsSort, Check, ChevronDown, Clock, Edit, ListDetails, Search, Settings, Star, Trash
 } from '@vicons/tabler'
 import type { Category, PromptWithRelations } from '@shared/types/database'
 import { useTagColors } from '@/composables/useTagColors'
 import { sortPromptsForLibrary, type PromptLibrarySortBy } from '@/lib/utils/prompt-library-sort'
+import { resolveIcon } from '@/lib/utils/icon-registry'
 
 interface Props {
     prompts: PromptWithRelations[]
@@ -158,6 +168,8 @@ const emit = defineEmits<{
     select: [prompt: PromptWithRelations]
     'manage-categories': []
     'batch-delete': [ids: number[]]
+    'edit-category': [category: Category]
+    'delete-category': [category: Category]
 }>()
 
 const { t } = useI18n()
@@ -315,6 +327,36 @@ const clearFilters = () => {
 
 const toggleCategoryList = () => {
     isCategoryListCollapsed.value = !isCategoryListCollapsed.value
+}
+
+// 分类右键菜单：常用操作（编辑 / 删除），交由父组件打开分类管理并直达对应动作
+const categoryMenu = ref({ show: false, x: 0, y: 0, category: null as Category | null })
+
+const categoryMenuOptions = computed(() => [
+    {
+        label: t('common.edit'),
+        key: 'edit',
+        icon: () => h(NIcon, { size: 15 }, { default: () => h(Edit) }),
+    },
+    {
+        label: t('common.delete'),
+        key: 'delete',
+        icon: () => h(NIcon, { size: 15 }, { default: () => h(Trash) }),
+        props: { style: { color: 'var(--accent-error, #d5393a)' } },
+    },
+])
+
+const openCategoryMenu = (event: MouseEvent, category: Category) => {
+    categoryMenu.value = { show: false, x: event.clientX, y: event.clientY, category }
+    nextTick(() => { categoryMenu.value.show = true })
+}
+
+const handleCategoryMenuSelect = (key: string) => {
+    categoryMenu.value.show = false
+    const category = categoryMenu.value.category
+    if (!category) return
+    if (key === 'edit') emit('edit-category', category)
+    else if (key === 'delete') emit('delete-category', category)
 }
 
 const handleSearchShortcut = (event: KeyboardEvent) => {

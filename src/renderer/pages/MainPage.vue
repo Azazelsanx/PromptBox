@@ -19,13 +19,17 @@ import {
 } from '@vicons/tabler'
 import {
     AIConfigNavigationIcon,
+    BotNavigationIcon,
     PromptNavigationIcon,
     SettingsNavigationIcon,
+    VariableNavigationIcon,
 } from '@/theme/navigation-icons'
 
 import SettingsPage from './SettingsPage.vue'
 import PromptManagementPage from './PromptManagementPage.vue'
 import AIConfigPage from './AIConfigPage.vue'
+import VariableManagementPage from './VariableManagementPage.vue'
+import BotsPage from './BotsPage.vue'
 import StatusBar from '~/components/common/StatusBar.vue'
 
 const { t } = useI18n()
@@ -45,9 +49,19 @@ const menuOptions: MenuOption[] = [
         icon: () => h(NIcon, null, { default: () => h(PromptNavigationIcon) })
     },
     {
+        label: t('mainPage.menu.variables'),
+        key: 'variables',
+        icon: () => h(NIcon, null, { default: () => h(VariableNavigationIcon) })
+    },
+    {
         label: t('mainPage.menu.aiConfig'),
         key: 'ai-config',
         icon: () => h(NIcon, null, { default: () => h(AIConfigNavigationIcon) })
+    },
+    {
+        label: t('mainPage.menu.bots'),
+        key: 'bots',
+        icon: () => h(NIcon, null, { default: () => h(BotNavigationIcon) })
     },
     {
         label: t('mainPage.menu.settings'),
@@ -136,7 +150,9 @@ onBeforeUnmount(() => removeShortcutNavigation?.())
                     <NLayoutContent content-style="overflow-y: auto; height: 100%;">
                         <PromptManagementPage v-if="currentView === 'prompts'" ref="promptManagementPageRef"
                             @navigate-to-ai-config="handleNavigateToAIConfig" />
+                        <VariableManagementPage v-else-if="currentView === 'variables'" />
                         <AIConfigPage v-else-if="currentView === 'ai-config'" ref="aiConfigPageRef" />
+                        <BotsPage v-else-if="currentView === 'bots'" />
                         <SettingsPage v-else-if="currentView === 'settings'" :target-section="settingsTargetSection" />
                     </NLayoutContent>
                 </NLayout>

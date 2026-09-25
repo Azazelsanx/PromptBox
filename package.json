@@ -105,6 +105,7 @@
         "zod": "^3.25.40"
     },
     "dependencies": {
+        "@icon-park/vue-next": "^1.4.2",
         "@langchain/anthropic": "^0.3.21",
         "@langchain/core": "^0.3.57",
         "@langchain/ollama": "^0.2.1",

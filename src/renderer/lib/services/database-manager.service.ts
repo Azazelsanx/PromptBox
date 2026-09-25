@@ -17,6 +17,7 @@ import { AIConfigService } from './ai-config.service';
 import { AIGenerationHistoryService } from './ai-generation-history.service';
 import { AppSettingsService } from './app-settings.service';
 import { QuickOptimizationService } from './quick-optimization.service';
+import { BotService } from './bot.service';
 import { generateUUID } from '../utils/uuid';
 import { emitDataChange } from './data-change-events';
 import { unwrapBackupData } from '@shared/backup-integrity';
@@ -32,6 +33,7 @@ const SYNCABLE_DATA_STORES = [
   'quick_optimization_configs',
   'ai_generation_history',
   'settings',
+  'bots',
   'syncTombstones'
 ];
 
@@ -44,6 +46,7 @@ const RESTORABLE_DATA_FIELDS = [
   'quickOptimizationConfigs',
   'aiHistory',
   'settings',
+  'bots',
   'syncTombstones'
 ];
 
@@ -58,6 +61,7 @@ const RESTORE_STORE_BY_COLLECTION: Record<string, string> = {
   quickOptimizationConfigs: 'quick_optimization_configs',
   aiHistory: 'ai_generation_history',
   settings: 'settings',
+  bots: 'bots',
   syncTombstones: 'syncTombstones'
 };
 
@@ -99,6 +103,7 @@ export class DatabaseServiceManager {
   public readonly aiGenerationHistory: AIGenerationHistoryService;
   public readonly appSettings: AppSettingsService;
   public readonly quickOptimization: QuickOptimizationService;
+  public readonly bot: BotService;
 
   private constructor() {
     // 初始化所有服务实例
@@ -108,6 +113,7 @@ export class DatabaseServiceManager {
     this.aiGenerationHistory = AIGenerationHistoryService.getInstance();
     this.appSettings = AppSettingsService.getInstance();
     this.quickOptimization = QuickOptimizationService.getInstance();
+    this.bot = BotService.getInstance();
   }
 
   /**
@@ -408,6 +414,7 @@ export class DatabaseServiceManager {
       let quickOptimizationConfigs: any[];
       let aiHistory: any[];
       let settings: any[];
+      let bots: any[];
 
       if (consistentSnapshot) {
         ({
@@ -418,7 +425,8 @@ export class DatabaseServiceManager {
           aiConfigs,
           quickOptimizationConfigs,
           aiHistory,
-          settings
+          settings,
+          bots
         } = consistentSnapshot);
       } else {
         // Compatibility path for tests and legacy/incomplete databases. A
@@ -431,9 +439,10 @@ export class DatabaseServiceManager {
           this.aiConfig.getAllAIConfigs(),
           this.quickOptimization.getAllQuickOptimizationConfigs(),
           this.aiGenerationHistory.getAllAIGenerationHistory(),
-          this.appSettings.getAllSettings()
+          this.appSettings.getAllSettings(),
+          this.bot.getAllBots()
         ]);
-        const tableNames = ['categories', 'prompts', 'promptVariables', 'promptHistories', 'aiConfigs', 'quickOptimizationConfigs', 'aiHistory', 'settings'];
+        const tableNames = ['categories', 'prompts', 'promptVariables', 'promptHistories', 'aiConfigs', 'quickOptimizationConfigs', 'aiHistory', 'settings', 'bots'];
         const failedTables = results
           .map((result, index) => result.status === 'rejected'
             ? { tableName: tableNames[index], reason: result.reason }
@@ -452,10 +461,11 @@ export class DatabaseServiceManager {
           aiConfigs,
           quickOptimizationConfigs,
           aiHistory,
-          settings
+          settings,
+          bots
         ] = results.map(result => result.status === 'fulfilled' ? (result.value || []) : []);
       }
-      
+
       const exportData = this.attachRelationUUIDsToExportData({
         categories: categories as any[],
         prompts: prompts as any[],
@@ -464,7 +474,8 @@ export class DatabaseServiceManager {
         aiConfigs: aiConfigs as any[],
         quickOptimizationConfigs: quickOptimizationConfigs as any[],
         aiHistory: aiHistory as any[],
-        settings: settings as any[]
+        settings: settings as any[],
+        bots: bots as any[]
       });
       
       this.debugLog('渲染进程: 数据导出完成', {
@@ -475,7 +486,8 @@ export class DatabaseServiceManager {
         AI配置数: exportData.aiConfigs.length,
         快速优化配置数: exportData.quickOptimizationConfigs.length,
         AI历史数: exportData.aiHistory.length,
-        设置数: exportData.settings.length
+        设置数: exportData.settings.length,
+        Bot数: exportData.bots?.length || 0
       });
       
       return {
@@ -1386,6 +1398,7 @@ export class DatabaseServiceManager {
     );
     const aiHistory = this.sortRestoreRecords(data.aiHistory || [], 'aiHistory');
     const settings = this.sortRestoreRecords(data.settings || [], 'settings');
+    const bots = this.sortRestoreRecords(data.bots || [], 'bots');
     const syncTombstones = this.sortRestoreRecords(data.syncTombstones || [], 'syncTombstones');
 
     this.assertUniqueRestoreValues(categories, 'categories', 'name', 'categories.name');
@@ -1404,6 +1417,7 @@ export class DatabaseServiceManager {
     this.assertUniqueRestoreValues(aiHistory, 'aiHistory', 'uuid', 'ai_generation_history.uuid');
     this.assertUniqueRestoreValues(aiHistory, 'aiHistory', 'historyId', 'ai_generation_history.historyId');
     this.assertUniqueRestoreValues(settings, 'settings', 'key', 'settings.key');
+    this.assertUniqueRestoreValues(bots, 'bots', 'uuid', 'bots.uuid');
 
     const categoryIdByUuid = new Map<string, number>();
     const categoryIdsBySourceId = this.createSourceIdMap(categories);
@@ -1517,6 +1531,9 @@ export class DatabaseServiceManager {
     );
     settings.forEach((record: any, index: number) =>
       records.push(this.createPreparedRecord('settings', { ...record, id: index + 1 }))
+    );
+    bots.forEach((record: any, index: number) =>
+      records.push(this.createPreparedRecord('bots', { ...record, id: index + 1 }))
     );
 
     for (const [index, tombstone] of syncTombstones.entries()) {
@@ -1756,6 +1773,7 @@ export class DatabaseServiceManager {
       quickOptimizationConfigs: ['uuid', 'id'],
       aiHistory: ['historyId', 'uuid', 'id'],
       settings: ['key', 'id'],
+      bots: ['uuid', 'id'],
       syncTombstones: ['recordKey', 'recordUuid', 'id']
     };
     for (const field of identityFields[collection] || ['uuid', 'key', 'id']) {
@@ -1907,6 +1925,7 @@ export class DatabaseServiceManager {
     quickOptimizationConfigs: any[];
     aiHistory: any[];
     settings: any[];
+    bots: any[];
   } | null> {
     const db = await this.getDatabase();
     const stores = [
@@ -1917,7 +1936,8 @@ export class DatabaseServiceManager {
       'ai_configs',
       'quick_optimization_configs',
       'ai_generation_history',
-      'settings'
+      'settings',
+      'bots'
     ];
     if (!db || stores.some(storeName => !db.objectStoreNames.contains(storeName))) return null;
 
@@ -1959,7 +1979,8 @@ export class DatabaseServiceManager {
           aiConfigs: values.get('ai_configs') || [],
           quickOptimizationConfigs: values.get('quick_optimization_configs') || [],
           aiHistory: values.get('ai_generation_history') || [],
-          settings: values.get('settings') || []
+          settings: values.get('settings') || [],
+          bots: values.get('bots') || []
         });
       };
     });

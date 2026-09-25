@@ -67,6 +67,10 @@ const mockQuickOptService = {
   getAllQuickOptimizationConfigs: vi.fn(),
   createQuickOptimizationConfigFromBackup: vi.fn(),
 }
+const mockBotService = {
+  getInstance: vi.fn(),
+  getAllBots: vi.fn(),
+}
 
 vi.mock('~/lib/services/category.service', () => ({
   CategoryService: { getInstance: () => mockCategoryService }
@@ -85,6 +89,9 @@ vi.mock('~/lib/services/app-settings.service', () => ({
 }))
 vi.mock('~/lib/services/quick-optimization.service', () => ({
   QuickOptimizationService: { getInstance: () => mockQuickOptService }
+}))
+vi.mock('~/lib/services/bot.service', () => ({
+  BotService: { getInstance: () => mockBotService }
 }))
 
 global.FileReader = class {
@@ -114,6 +121,7 @@ const STORE_DEFINITIONS: Record<string, StoreDefinition> = {
   quick_optimization_configs: { indexes: { uuid: { keyPath: 'uuid', unique: true } } },
   ai_generation_history: { indexes: { historyId: { keyPath: 'historyId', unique: true }, uuid: { keyPath: 'uuid', unique: true } } },
   settings: { indexes: { key: { keyPath: 'key', unique: true } } },
+  bots: { indexes: { uuid: { keyPath: 'uuid', unique: true } } },
   syncTombstones: { indexes: {} }
 }
 
@@ -164,6 +172,7 @@ const baseData = {
   quickOptimizationConfigs: [mockQuickOptimizationConfig],
   aiHistory: [],
   settings: [mockSetting],
+  bots: [],
 }
 
 // 移动端备份文件格式（createCloudBackup 生成的）
@@ -218,6 +227,10 @@ describe('跨平台备份兼容性', () => {
       id: setting.id ?? index + 1,
       ...setting
     })))
+    indexedDb.seed('bots', (data.bots || []).map((bot: any, index: number) => ({
+      id: bot.id ?? index + 1,
+      ...bot
+    })))
     indexedDb.seed('syncTombstones', [])
   }
 
@@ -247,6 +260,7 @@ describe('跨平台备份兼容性', () => {
     mockQuickOptService.getAllQuickOptimizationConfigs.mockResolvedValue([mockQuickOptimizationConfig])
     mockAIHistoryService.getAllAIGenerationHistory.mockResolvedValue([])
     mockAppSettingsService.getAllSettings.mockResolvedValue([mockSetting])
+    mockBotService.getAllBots.mockResolvedValue([])
 
     mockCategoryService.createCategory.mockResolvedValue({ ...mockCategory, id: 10 })
     mockPromptService.createPrompt.mockResolvedValue({ ...mockPrompt, id: 20 })

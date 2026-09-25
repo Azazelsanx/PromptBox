@@ -4,9 +4,11 @@
       <StructuredPromptEditor ref="structuredEditorRef" :content="content" :variables="localVariables"
         :selected-variable="selectedVariable" :readonly="isStreaming"
         :show-variables-button="compactInspector"
+        :library-variables="libraryEditorVariables"
         :placeholder="t('promptManagement.contentPlaceholder')" @update:content="handleContentUpdate"
-        @select-variable="selectVariable" @request-add-variable="addVariable"
-        @request-open-variables="showInspectorDrawer = true" />
+        @select-variable="selectVariable" @request-insert-variables="showVariablePicker = true"
+        @request-open-variables="showInspectorDrawer = true"
+        @variable-created="handleVariableCreated" />
 
       <QuickOptimizationActions ref="quickOptimizationRef" :content="content"
         :quick-optimization-configs="quickOptimizationConfigs" :optimizing="optimizing"
@@ -19,6 +21,8 @@
 
     <VariableInspector v-if="!compactInspector" :variables="localVariables" :active-names="parsed.variableNames"
       :occurrences="occurrenceCounts" :selected-variable="selectedVariable" :readonly="isStreaming"
+      :library-rules="libraryDisplayRules" :library-variables="libraryVariables"
+      :library-group-paths="libraryGroupPaths"
       @select="selectVariable" @request-add="addVariable" @request-insert="insertExistingVariable"
       @request-remove="removeVariable" @update-variable="updateVariable" />
 
@@ -26,10 +30,16 @@
       <NDrawerContent :title="t('promptEditor.variables')" closable body-content-style="padding: 0; overflow: hidden;">
         <VariableInspector :variables="localVariables" :active-names="parsed.variableNames"
           :occurrences="occurrenceCounts" :selected-variable="selectedVariable" :readonly="isStreaming"
+          :library-rules="libraryDisplayRules" :library-variables="libraryVariables"
+          :library-group-paths="libraryGroupPaths"
           @select="selectVariable" @request-add="addVariable" @request-insert="insertExistingVariable"
           @request-remove="removeVariable" @update-variable="updateVariable" />
       </NDrawerContent>
     </NDrawer>
+
+    <VariablePickerModal v-model:show="showVariablePicker" :variables="localVariables"
+      :active-names="parsed.variableNames" :library-variables="libraryEditorVariables"
+      @confirm="insertExistingVariable" />
 
   </div>
 </template>
@@ -45,7 +55,9 @@ import {
 } from '@/lib/utils/prompt-template'
 import StructuredPromptEditor from './StructuredPromptEditor.vue'
 import VariableInspector from './VariableInspector.vue'
+import VariablePickerModal from './VariablePickerModal.vue'
 import QuickOptimizationActions from './QuickOptimizationActions.vue'
+import { useGlobalVariableLibrary } from '@/lib/utils/global-variable-library'
 
 interface Props {
   content: string
@@ -73,6 +85,7 @@ const quickOptimizationRef = ref<InstanceType<typeof QuickOptimizationActions>>(
 const selectedVariable = ref('')
 const compactInspector = ref(false)
 const showInspectorDrawer = ref(false)
+const showVariablePicker = ref(false)
 let resizeObserver: ResizeObserver | null = null
 let variableCache = new Map<string, EditablePromptVariable>()
 
@@ -84,6 +97,19 @@ const localVariables = computed(() => reconcilePromptVariables(props.content, [
 const occurrenceCounts = computed(() => Object.fromEntries(
   Array.from(parsed.value.occurrences.entries()).map(([name, occurrences]) => [name, occurrences.length])
 ))
+
+// 全局库变量：编辑器右键"插入变量"菜单 + 变量面板的库分区
+const { libraryVariables, libraryGroupPaths } = useGlobalVariableLibrary()
+const libraryEditorVariables = computed<EditablePromptVariable[]>(() => libraryVariables.value.map(definition => ({
+  name: definition.name,
+  type: definition.type,
+  required: definition.required,
+  displayRule: definition.displayRule,
+})))
+/** 库默认显示规则（按变量名索引）：变量编辑弹窗展示「跟随默认」用 */
+const libraryDisplayRules = computed(() => Object.fromEntries(libraryVariables.value
+  .filter(definition => definition.displayRule)
+  .map(definition => [definition.name, definition.displayRule!])))
 
 watch(() => props.variables, variables => {
   variables.forEach(variable => variableCache.set(variable.name, { ...variable, options: [...(variable.options || [])] }))
@@ -109,6 +135,15 @@ onMounted(() => {
 onBeforeUnmount(() => resizeObserver?.disconnect())
 
 const handleContentUpdate = (content: string) => emit('update:content', content)
+
+// 右键"创建变量"后：登记到变量列表（带编辑器里选的类型）
+const handleVariableCreated = (variable: EditablePromptVariable) => {
+  const merged: EditablePromptVariable = { ...createVariable(variable.name), ...variable }
+  variableCache.set(variable.name, merged)
+  const rest = localVariables.value.filter(item => item.name !== variable.name)
+  emit('update:variables', [...rest, merged], 'user')
+  selectedVariable.value = variable.name
+}
 
 const generateUniqueVariableName = () => {
   const names = new Set(localVariables.value.map(variable => variable.name))
@@ -168,7 +203,7 @@ defineExpose({
 </script>
 
 <style scoped>
-.regular-editor-workspace { position: relative; box-sizing: border-box; width: 100%; height: 100%; min-height: 0; padding-bottom: var(--content-padding); display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--section-gap); background: var(--surface-primary); }
+.regular-editor-workspace { position: relative; box-sizing: border-box; width: 100%; height: 100%; min-height: 0; padding-bottom: var(--content-padding); display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--section-gap); background: var(--surface-primary); font-family: var(--font-prompt); }
 .editor-primary-column { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--compact-padding); }
 .editor-primary-column > :first-child { flex: 1; min-height: 220px; }
 .regular-editor-workspace.compact { grid-template-columns: minmax(0, 1fr); }

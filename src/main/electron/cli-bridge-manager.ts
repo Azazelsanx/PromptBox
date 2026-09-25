@@ -304,7 +304,7 @@ class CliBridgeManager {
       return Promise.resolve({
         id: '',
         ok: false,
-        error: { message: 'AI Gist window is not available', code: 'NO_WINDOW' },
+        error: { message: 'PromptBox window is not available', code: 'NO_WINDOW' },
       });
     }
 

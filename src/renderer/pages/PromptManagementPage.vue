@@ -33,7 +33,8 @@
                     <template #1>
                         <PromptLibrarySidebar :prompts="prompts" :categories="categories"
                             :selected-id="selectedPrompt?.id" :loading="loading" @select="handleSelectPrompt"
-                            @manage-categories="showCategoryManagement = true" @batch-delete="handleBatchDelete" />
+                            @manage-categories="showCategoryManagement = true" @batch-delete="handleBatchDelete"
+                            @edit-category="handleEditCategoryFromSidebar" @delete-category="handleDeleteCategoryFromSidebar" />
                     </template>
 
                     <template #resize-trigger>
@@ -72,7 +73,7 @@
             @navigate-to-ai-config="handleNavigateToAIConfig"
             @open-quick-optimization-config="showQuickOptimizationModal = true" />
 
-        <CategoryManageModal v-model:show="showCategoryManagement" :categories="categories"
+        <CategoryManageModal ref="categoryManageRef" v-model:show="showCategoryManagement" :categories="categories"
             @updated="handleCategoriesUpdated" />
 
         <QuickOptimizationConfigModal :show="showQuickOptimizationModal"
@@ -83,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NButton, NIcon, NSplit, NText, useDialog, useMessage } from 'naive-ui'
 import { Folder, GridDots, LayoutSidebarRight, List, Plus } from '@vicons/tabler'
@@ -119,6 +120,17 @@ const libraryPaneSize = ref(storedLibraryPaneSize && /^\d+(\.\d+)?px$/.test(stor
     ? storedLibraryPaneSize
     : '268px')
 const showCategoryManagement = ref(false)
+const categoryManageRef = ref<InstanceType<typeof CategoryManageModal> | null>(null)
+
+// 侧边栏分类右键：编辑 / 删除（打开分类管理后直达对应动作）
+const handleEditCategoryFromSidebar = (category: Category) => {
+    showCategoryManagement.value = true
+    nextTick(() => { categoryManageRef.value?.openFormEdit(category) })
+}
+const handleDeleteCategoryFromSidebar = (category: Category) => {
+    showCategoryManagement.value = true
+    nextTick(() => { categoryManageRef.value?.handleDelete(category) })
+}
 const showQuickOptimizationModal = ref(false)
 const showWorkspaceModal = ref(false)
 const showCreationModal = ref(false)

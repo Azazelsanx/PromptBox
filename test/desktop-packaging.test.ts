@@ -223,7 +223,7 @@ describe('desktop packaging', () => {
       identityName: 'YarinZ.AIGist-PromptManager',
       publisher: 'CN=B0E00209-75E9-44EE-B4B3-F71D2E3B4634',
       publisherDisplayName: 'Yarin Z',
-      displayName: 'AI Gist'
+      displayName: 'PromptBox'
     });
     expect(workflow).toContain("github.event.inputs.version == 'store'");
     expect(workflow).toContain('dist/AI-Gist-*-Windows-Store-*.appx');

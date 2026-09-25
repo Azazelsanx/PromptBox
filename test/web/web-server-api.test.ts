@@ -601,6 +601,7 @@ function createWebSyncDataSet(input: {
       type: 'string',
       updatedAt: '2026-06-13T20:00:00.000Z'
     }],
+    bots: [],
     syncTombstones: []
   }
 }

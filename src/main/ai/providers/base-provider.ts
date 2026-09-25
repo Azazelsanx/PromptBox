@@ -1,4 +1,6 @@
 import { net } from 'electron';
+import { ChatOpenAI } from '@langchain/openai';
+import { BaseMessage } from '@langchain/core/messages';
 import { AIConfig, AIGenerationRequest, AIGenerationResult } from '@shared/types/ai';
 import { buildPrompts } from './prompt-templates';
 import { NetworkProxyManager } from '../../electron/network-proxy';
@@ -85,6 +87,19 @@ export interface AIProvider {
     onProgress: (charCount: number, partialContent?: string) => boolean,
     abortSignal?: AbortSignal
   ): Promise<AIGenerationResult>;
+
+  /**
+   * Bot 图片逆向提示词（可选能力，多模态供应商各自实现）
+   * 调用方以 `typeof provider.reversePromptFromImage === 'function'` 做能力探测
+   */
+  reversePromptFromImage?(options: {
+    config: AIConfig;
+    instruction: string;
+    imageDataUrl: string;
+    model?: string;
+    signal?: AbortSignal;
+    onProgress?: (partial: string) => void;
+  }): Promise<{ prompt: string; model: string }>;
 }
 
 /**
@@ -359,8 +374,71 @@ export abstract class BaseAIProvider implements AIProvider {
     if (providerName === 'aliyun' && errorMessage?.includes('400')) {
       return '阿里云：请求参数错误，请检查模型名称和API配置';
     }
+    if (providerName === 'qianwen' && errorMessage?.includes('400')) {
+      return '千问AI：请求参数错误，请检查模型名称和API配置';
+    }
     
     return errorMessage || '未知错误';
+  }
+
+  /**
+   * 图片逆向提示词失败的统一可读化（各多模态供应商共享）
+   * 纯文本模型通常表现为 404 模型不存在或参数不支持图片
+   */
+  protected buildReversePromptError(error: any): string {
+    const raw = error?.message || String(error);
+    if (/abort/i.test(raw)) {
+      return '任务已取消';
+    }
+    if (raw.includes('请求超时')) {
+      return '逆向超时，请检查网络连接或服务状态';
+    }
+    if (/404|not\s*found|does\s*not\s*exist/i.test(raw) && /model/i.test(raw)) {
+      return `当前模型不支持图片输入（服务端找不到该模型或不支持多模态），请在 Bot 设置中改用视觉模型（如 qwen-vl 系列、gpt-4o、glm-4v、gemini-vl 等）。原始错误: ${raw}`;
+    }
+    if (/image|vision|multimodal|unsupported|not\s*support/i.test(raw)) {
+      return `当前模型不支持图片输入，请在 Bot 设置中改用视觉模型（如 qwen-vl 系列、gpt-4o、glm-4v、gemini-vl 等）。原始错误: ${raw}`;
+    }
+    return `逆向失败: ${raw}`;
+  }
+
+  /**
+   * 消费逆向流式输出：累积片段并通过 onProgress 回传（渲染层悬停可实时预览正在书写的提示词）
+   * 超时基于内容活动判断：持续有新片段即视为活跃
+   */
+  protected async consumeReverseStream(
+    llm: ChatOpenAI,
+    messages: BaseMessage[],
+    signal: AbortSignal | undefined,
+    onProgress?: (partial: string) => void
+  ): Promise<string> {
+    let accumulated = '';
+    let lastContentAt = Date.now();
+
+    const streamPromise = (async () => {
+      const stream = await llm.stream(messages, signal ? { signal } : undefined);
+      for await (const chunk of stream) {
+        const piece = typeof chunk === 'string' ? chunk : (chunk as any)?.content;
+        if (piece) {
+          accumulated += piece;
+          lastContentAt = Date.now();
+          onProgress?.(accumulated);
+        }
+      }
+    })();
+
+    await this.withSmartTimeout(
+      streamPromise,
+      120000,
+      5000,
+      () => Date.now() - lastContentAt < 5000
+    );
+
+    const prompt = accumulated.trim();
+    if (!prompt) {
+      throw new Error('模型返回内容为空');
+    }
+    return prompt;
   }
 
   /**

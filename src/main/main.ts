@@ -55,6 +55,13 @@ function attachSystemSessionEndHandler(window: BrowserWindow): void {
 // 防止多重启动 - 初始化单实例管理器
 singleInstanceManager.initialize();
 
+// 字体渲染质量（须在 app ready 之前注册）：
+// 内嵌 webfont（woff2 子集）默认被 Chromium 以灰度抗锯齿 + 无 hinting 渲染，
+// 中文小字号笔画发虚、锯齿感明显。开启 LCD 子像素渲染与完整 hinting，
+// 让内嵌字体获得接近系统 ClearType 的渲染质量，全平台生效。
+app.commandLine.appendSwitch('enable-lcd-text');
+app.commandLine.appendSwitch('font-render-hinting', 'full');
+
 
 
 // 应用准备就绪时的初始化流程
@@ -158,6 +165,13 @@ app.whenReady().then(async () => {
   mainWindow.webContents.once('did-finish-load', () => {
     console.log('主窗口加载完成，通知当前主题');
     themeManager.notifyCurrentTheme();
+  });
+
+  // 临时诊断：转发渲染进程的告警/错误到主进程日志
+  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    if (level >= 2) {
+      console.log(`[renderer-console:${level}] ${message} @ ${sourceId}:${line}`);
+    }
   });
 });
 

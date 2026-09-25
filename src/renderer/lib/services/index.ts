@@ -10,6 +10,7 @@ import { PromptService } from './prompt.service';
 import { AIConfigService } from './ai-config.service';
 import { AIGenerationHistoryService } from './ai-generation-history.service';
 import { AppSettingsService } from './app-settings.service';
+import { BotService } from './bot.service';
 import { DatabaseServiceManager } from './database-manager.service';
 
 // 导出所有服务类
@@ -19,6 +20,7 @@ export { PromptService } from './prompt.service';
 export { AIConfigService } from './ai-config.service';
 export { AIGenerationHistoryService } from './ai-generation-history.service';
 export { AppSettingsService } from './app-settings.service';
+export { BotService, botService } from './bot.service';
 export { DatabaseServiceManager } from './database-manager.service';
 export { CloudSyncService, cloudSyncService } from './cloud-sync.service';
 export { CloudSyncV2Coordinator } from './cloud-sync-v2-coordinator';
@@ -45,3 +47,4 @@ export const promptService = PromptService.getInstance();
 export const aiConfigService = AIConfigService.getInstance();
 export const aiGenerationHistoryService = AIGenerationHistoryService.getInstance();
 export const appSettingsService = AppSettingsService.getInstance();
+export const botServiceInstance = BotService.getInstance();

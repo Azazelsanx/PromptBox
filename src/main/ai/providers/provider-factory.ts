@@ -39,6 +39,7 @@ export class AIProviderFactory {
       case 'siliconflow':
       case 'tencent':
       case 'aliyun':
+      case 'qianwen':
         provider = new OpenAICompatibleProvider();
         break;
       case 'ollama':
@@ -89,6 +90,7 @@ export class AIProviderFactory {
       'siliconflow',
       'tencent',
       'aliyun',
+      'qianwen',
       'zhipu',
       'openrouter',
       'ollama',

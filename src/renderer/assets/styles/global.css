@@ -96,6 +96,13 @@ html:lang(ja) {
   --font-cjk-fallback: "AppCJK-JP", "AppCJK-SC";
 }
 
+/* 提示词编辑器/最终结果专用字体：系统原生字体栈（原生 hinting + ClearType/苹方渲染，
+   实测优于内嵌 webfont 的渲染质量；各平台自动取各自最佳 CJK 字体）。
+   若系统装有 MiSans 则优先使用（本地字形、原生渲染），无则顺延苹方/鸿蒙黑体/雅黑。 */
+:root {
+  --font-prompt: "MiSans", "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
 /* 根元素样式 - 确保在拖拽时不显示白色背景 */
 html {
   height: 100%;

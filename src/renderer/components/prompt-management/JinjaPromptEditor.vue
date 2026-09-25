@@ -6,7 +6,7 @@
         :variable-count="jinjaActiveNames.length"
         :show-variables-button="compactInspector" :placeholder="t('promptManagement.jinjaTemplatePlaceholder')"
         @update:content="$emit('update:content', $event)" @select-variable="selectVariable"
-        @request-add-variable="addJinjaVariable" @request-open-variables="showInspectorDrawer = true">
+        @request-insert-variables="showVariablePicker = true" @request-open-variables="showInspectorDrawer = true">
         <template #toolbar-prefix>
           <div class="template-status" :class="{ invalid: !templateValidation.isValid }">
             <NIcon size="16">
@@ -70,6 +70,9 @@
       </NDrawerContent>
     </NDrawer>
 
+    <VariablePickerModal v-model:show="showVariablePicker" :variables="jinjaVariables"
+      :active-names="jinjaActiveNames" @confirm="insertVariableToTemplate" />
+
     <NDrawer v-model:show="showTemplatePreview" :width="640" placement="right">
       <NDrawerContent :title="t('promptManagement.jinjaTemplatePreview')" closable
         body-content-style="padding: 16px; overflow: hidden;">
@@ -121,6 +124,7 @@ import PromptFillCanvas from './PromptFillCanvas.vue'
 import QuickOptimizationActions from './QuickOptimizationActions.vue'
 import StructuredPromptEditor from './StructuredPromptEditor.vue'
 import VariableInspector from './VariableInspector.vue'
+import VariablePickerModal from './VariablePickerModal.vue'
 
 type JinjaVariable = EditablePromptVariable
 
@@ -153,6 +157,7 @@ const selectedJinjaVariable = ref('')
 const jinjaVariables = ref<JinjaVariable[]>([])
 const compactInspector = ref(false)
 const showInspectorDrawer = ref(false)
+const showVariablePicker = ref(false)
 const showSyntaxHelp = ref(false)
 const showTemplatePreview = ref(false)
 const previewVariableValues = ref<Record<string, any>>({})
@@ -164,7 +169,20 @@ let syncingFromProps = false
 const cloneVariables = (variables: JinjaVariable[]) => variables.map(variable => ({
   ...variable,
   options: variable.options ? [...variable.options] : undefined,
+  optionMeta: variable.optionMeta
+    ? Object.fromEntries(Object.entries(variable.optionMeta).map(([key, meta]) => [key, { ...meta }]))
+    : undefined,
+  sku: variable.sku
+    ? {
+      ...variable.sku,
+      dimensions: variable.sku.dimensions.map(dimension => ({ ...dimension, values: [...dimension.values] })),
+      enabled: variable.sku.enabled ? [...variable.sku.enabled] : undefined,
+      comboOrder: variable.sku.comboOrder ? [...variable.sku.comboOrder] : undefined,
+    }
+    : undefined,
   validation: variable.validation ? { ...variable.validation } : undefined,
+  decor: variable.decor ? { ...variable.decor } : undefined,
+  displayRule: variable.displayRule ? { ...variable.displayRule } : undefined,
 }))
 
 const variableSignature = (variables: JinjaVariable[]) => JSON.stringify(variables.map(variable => ({
@@ -175,6 +193,10 @@ const variableSignature = (variables: JinjaVariable[]) => JSON.stringify(variabl
   required: variable.required !== false,
   placeholder: variable.placeholder || '',
   description: variable.description || '',
+  optionMeta: variable.optionMeta || null,
+  sku: variable.sku || null,
+  decor: variable.decor || null,
+  displayRule: variable.displayRule || null,
 })))
 
 const jinjaActiveNames = computed(() => {
@@ -358,7 +380,7 @@ defineExpose({
 </script>
 
 <style scoped>
-.jinja-editor-workspace { box-sizing: border-box; position: relative; width: 100%; height: 100%; min-height: 0; padding-bottom: var(--content-padding); display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--section-gap); background: var(--surface-primary); }
+.jinja-editor-workspace { box-sizing: border-box; position: relative; width: 100%; height: 100%; min-height: 0; padding-bottom: var(--content-padding); display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: var(--section-gap); background: var(--surface-primary); font-family: var(--font-prompt); }
 .jinja-primary-column { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: var(--compact-padding); }
 .jinja-primary-column > :first-child { flex: 1; min-height: 220px; }
 .template-status { min-width: 0; display: flex; align-items: center; gap: 8px; }

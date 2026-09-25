@@ -763,6 +763,7 @@ function createRealisticDataSet(): CloudSyncDataSet {
       type: 'string',
       updatedAt: '2026-06-13T17:00:00.000Z'
     }],
+    bots: [],
     syncTombstones: []
   }
 }
@@ -777,6 +778,7 @@ function emptyDataSet(): CloudSyncDataSet {
     quickOptimizationConfigs: [],
     aiHistory: [],
     settings: [],
+    bots: [],
     syncTombstones: []
   }
 }

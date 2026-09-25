@@ -6,7 +6,7 @@ const { handler } = require('../action-runner');
 function register(program) {
   program
     .command('status')
-    .description('Check whether AI Gist is reachable through the local CLI bridge (run this first).')
+    .description('Check whether PromptBox is reachable through the local CLI bridge (run this first).')
     .addHelpText(
       'after',
       '\nExamples:\n' +
@@ -16,7 +16,7 @@ function register(program) {
     .action(
       handler(() => ({
         action: 'system.ping',
-        humanFormatter: () => chalk.green('AI Gist is reachable.'),
+        humanFormatter: () => chalk.green('PromptBox is reachable.'),
       }))
     );
 }

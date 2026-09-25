@@ -389,6 +389,31 @@
                                         :title="modelFetchState === 'success' ? t('aiConfig.workspace.modelsFetched') : t('aiConfig.workspace.modelsNotFetched')">
                                         {{ modelFetchMessage }}
                                     </NAlert>
+                                    <div v-if="showBatchAddPanel && fetchedModels.length" class="batch-add-panel ui-surface-muted">
+                                        <div class="batch-add-header">
+                                            <NCheckbox :checked="batchAllSelected" :indeterminate="batchIndeterminate"
+                                                @update:checked="toggleBatchAll">
+                                                {{ t('aiConfig.workspace.batchAddSelectAll', { count: fetchedModels.length }) }}
+                                            </NCheckbox>
+                                            <NButton size="tiny" type="primary" :disabled="!batchSelectedCount"
+                                                @click="applySelectedFetchedModels">
+                                                {{ t('aiConfig.workspace.batchAddApply', { count: batchSelectedCount }) }}
+                                            </NButton>
+                                        </div>
+                                        <NScrollbar class="batch-add-list">
+                                            <div class="batch-add-items">
+                                                <NCheckbox v-for="model in fetchedModels" :key="model"
+                                                    :checked="batchSelectedModels.includes(model)"
+                                                    :disabled="formData.models.includes(model)"
+                                                    @update:checked="(checked: boolean) => toggleBatchModel(model, checked)">
+                                                    <span class="batch-add-model-name">{{ model }}</span>
+                                                    <NTag v-if="formData.models.includes(model)" size="tiny" :bordered="false">
+                                                        {{ t('aiConfig.workspace.batchAddedTag') }}
+                                                    </NTag>
+                                                </NCheckbox>
+                                            </div>
+                                        </NScrollbar>
+                                    </div>
                                     <NForm :model="formData" label-placement="top">
                                         <NFormItem :label="t('aiConfig.workspace.availableModelNames')">
                                             <NDynamicTags v-model:value="formData.models" />
@@ -479,14 +504,14 @@
 import { computed, onMounted, reactive, ref, watch, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
-    NAlert, NButton, NDynamicTags, NEmpty, NFlex, NForm, NFormItem, NIcon, NInput,
+    NAlert, NButton, NCheckbox, NDynamicTags, NEmpty, NFlex, NForm, NFormItem, NIcon, NInput,
     NResult, NScrollbar, NSelect, NSpin, NSplit, NSwitch, NTag, NText, NTooltip,
     useDialog, useMessage,
 } from 'naive-ui'
 import {
     AccessPoint, Api, Atom, Book, BrandGoogle, BrandOpenSource, BrandWindows, Check,
     ChevronLeft, ChevronRight, Circles, Cloud, CloudDownload, DeviceDesktop, Edit, ExternalLink,
-    LetterA, LetterD, LetterM, LetterT, LetterX, LetterZ, ListDetails, Plus, Refresh, Robot, Route,
+    LetterA, LetterD, LetterM, LetterQ, LetterT, LetterX, LetterZ, ListDetails, Plus, Refresh, Robot, Route,
     Search, Server, Settings, Star, Trash,
 } from '@vicons/tabler'
 import { AIConfigNavigationIcon } from '@/theme/navigation-icons'
@@ -574,7 +599,7 @@ const formData = reactive({
 })
 
 const localProviderTypes: AIProviderType[] = ['ollama', 'lmstudio']
-const onlineProviderTypes: AIProviderType[] = ['openai', 'anthropic', 'google', 'azure', 'mistral', 'openrouter', 'deepseek', 'tencent', 'aliyun', 'zhipu', 'siliconflow']
+const onlineProviderTypes: AIProviderType[] = ['openai', 'anthropic', 'google', 'azure', 'mistral', 'openrouter', 'deepseek', 'tencent', 'aliyun', 'zhipu', 'qianwen', 'siliconflow']
 const allProviderTypes = [...localProviderTypes, ...onlineProviderTypes]
 
 const providerIcons: Record<AIProviderType, Component> = {
@@ -590,6 +615,7 @@ const providerIcons: Record<AIProviderType, Component> = {
     tencent: LetterT,
     aliyun: Cloud,
     zhipu: LetterZ,
+    qianwen: LetterQ,
     openrouter: Route,
 }
 
@@ -905,35 +931,72 @@ const buildTemporaryConfig = (): AIConfig => ({
     createdAt: editingConfig.value?.createdAt || new Date(), updatedAt: new Date(),
 })
 
-const confirmReplaceModels = () => new Promise<boolean>(resolve => {
-    let settled = false
-    const finish = (value: boolean) => { if (!settled) { settled = true; resolve(value) } }
-    dialog.warning({
-        title: t('aiConfig.workspace.replaceModelsTitle'), content: t('aiConfig.workspace.replaceModelsMessage'),
-        positiveText: t('aiConfig.workspace.fetchAndReplace'), negativeText: t('common.cancel'),
-        onPositiveClick: () => finish(true), onNegativeClick: () => finish(false), onClose: () => finish(false),
-    })
-})
+const fetchedModels = ref<string[]>([])
+const batchSelectedModels = ref<string[]>([])
+const showBatchAddPanel = ref(false)
+
+/** 拉取结果中尚未加入配置的模型 */
+const unaddedFetchedModels = computed(() => fetchedModels.value.filter(model => !formData.models.includes(model)))
+const batchSelectedCount = computed(() => batchSelectedModels.value.filter(model => !formData.models.includes(model)).length)
+const batchAllSelected = computed(() => unaddedFetchedModels.value.length > 0
+    && unaddedFetchedModels.value.every(model => batchSelectedModels.value.includes(model)))
+const batchIndeterminate = computed(() => batchSelectedModels.value.some(model => !formData.models.includes(model))
+    && !batchAllSelected.value)
+
+const toggleBatchAll = (checked: boolean) => {
+    batchSelectedModels.value = checked ? [...fetchedModels.value] : []
+}
+
+const toggleBatchModel = (model: string, checked: boolean) => {
+    if (checked) {
+        if (!batchSelectedModels.value.includes(model)) batchSelectedModels.value = [...batchSelectedModels.value, model]
+    } else {
+        batchSelectedModels.value = batchSelectedModels.value.filter(item => item !== model)
+    }
+}
+
+/** 把勾选的模型并入配置（union，不清空已有项与手动输入项） */
+const applySelectedFetchedModels = () => {
+    const additions = batchSelectedModels.value.filter(model => !formData.models.includes(model))
+    if (!additions.length) return
+    formData.models = [...formData.models, ...additions]
+    if (!formData.defaultModel && formData.models.length) formData.defaultModel = formData.models[0]
+    if (!selectedTestModel.value && formData.models.length) selectedTestModel.value = formData.models[0]
+    showBatchAddPanel.value = false
+}
 
 const fetchModelList = async (manual = false) => {
     if (!validateConnectionFields()) return false
-    if (manual && formData.models.length && !(await confirmReplaceModels())) return false
     fetchingModels.value = true
     modelFetchAttempted.value = true
     modelFetchState.value = 'idle'
     modelFetchMessage.value = ''
     try {
-        const models = [...new Set(await window.electronAPI.ai.getModels(serializeConfig(buildTemporaryConfig())))]
+        const result = await window.electronAPI.ai.getModels(serializeConfig(buildTemporaryConfig()))
+        const models = [...new Set(result.models ?? [])]
         if (!models.length) {
             modelFetchState.value = 'empty'
             modelFetchMessage.value = t('aiConfig.workspace.noModelsReturned')
             return false
         }
-        formData.models = models
-        if (!formData.defaultModel) formData.defaultModel = models[0]
-        if (!selectedTestModel.value) selectedTestModel.value = formData.defaultModel || models[0]
-        modelFetchState.value = 'success'
-        modelFetchMessage.value = t('aiConfig.workspace.modelFetchSuccess', { count: models.length })
+        fetchedModels.value = models
+        batchSelectedModels.value = [...models]
+        if (result.modelSource === 'default') {
+            // 远端列表不可用，回退到内置默认列表——明确告知，不要伪装成拉取成功
+            modelFetchState.value = 'warning'
+            modelFetchMessage.value = t('aiConfig.workspace.modelFetchFallback', { count: models.length })
+        } else {
+            modelFetchState.value = 'success'
+            modelFetchMessage.value = t('aiConfig.workspace.modelFetchSuccess', { count: models.length })
+        }
+        if (!manual) {
+            // 新建流程自动拉取：直接批量并入，保持"进来就有模型"的体验
+            applySelectedFetchedModels()
+        } else {
+            showBatchAddPanel.value = true
+        }
+        if (!formData.defaultModel && formData.models.length) formData.defaultModel = formData.models[0]
+        if (!selectedTestModel.value) selectedTestModel.value = formData.defaultModel || formData.models[0] || models[0]
         return true
     } catch (error) {
         modelFetchState.value = 'error'
@@ -1239,6 +1302,11 @@ defineExpose({ openAddConfigModal })
 .form-panel, .connection-test-panel { padding: var(--content-padding); }
 .model-list-heading { margin-bottom: 12px; }
 .model-fetch-result { margin-bottom: 14px; }
+.batch-add-panel { margin-bottom: 14px; padding: var(--compact-padding); }
+.batch-add-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
+.batch-add-list { max-height: 220px; }
+.batch-add-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px 12px; padding: 2px; }
+.batch-add-model-name { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: var(--font-size-xs); }
 .provider-help { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: var(--compact-padding); }
 .provider-help > div:first-child { min-width: 0; }
 .prompt-editor-shell { min-height: 0; display: flex; flex-direction: column; gap: var(--section-gap); }

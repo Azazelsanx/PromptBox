@@ -550,6 +550,8 @@ export class ICloudProvider implements CloudStorageProvider {
   }
 
   private createLocalFileEtag(stats: Awaited<ReturnType<typeof fs.stat>>): string {
+    // 新版 @types/node 中 fs.stat 返回值可视为可空，防御性取值
+    if (!stats) throw new Error('文件状态不可用');
     return `local-${String(stats.size)}-${Math.floor(Number(stats.mtimeMs))}`;
   }
 } 

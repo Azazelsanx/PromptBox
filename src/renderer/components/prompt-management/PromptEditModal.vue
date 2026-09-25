@@ -227,6 +227,31 @@
                             </NButton>
                         </NFlex>
 
+                        <!-- 撤销/恢复 + 草稿恢复提示 -->
+                        <NFlex size="small" :wrap="false" align="center">
+                            <NButton size="small" quaternary circle :disabled="!promptCanUndo"
+                                :title="t('common.undo')" :aria-label="t('common.undo')"
+                                @click="promptUndo">
+                                <template #icon><NIcon><ArrowBackUp /></NIcon></template>
+                            </NButton>
+                            <NButton size="small" quaternary circle :disabled="!promptCanRedo"
+                                :title="t('common.redo')" :aria-label="t('common.redo')"
+                                @click="promptRedo">
+                                <template #icon><NIcon><ArrowForwardUp /></NIcon></template>
+                            </NButton>
+                            <NTooltip :disabled="!promptDraftRestoredAt" trigger="hover" placement="bottom">
+                                <template #trigger>
+                                    <NTag size="small" type="info" :bordered="false" round>
+                                        {{ t('promptManagement.draftBadge') }}
+                                    </NTag>
+                                </template>
+                                {{ t('promptManagement.draftRestored', { time: promptDraftRestoredText }) }}
+                                <NButton text size="tiny" type="error" class="draft-discard-link" @click="discardPromptDraft">
+                                    {{ t('promptManagement.draftDiscard') }}
+                                </NButton>
+                            </NTooltip>
+                        </NFlex>
+
                         <!-- 显示当前活动的tab信息 -->
                         <NText depth="3" v-if="activeTab === 'history' && isEdit">
                             {{ t('promptManagement.historyDescription') }}
@@ -237,10 +262,17 @@
                     <!-- 右侧区域 -->
                     <NFlex size="small">
                         <NButton size="small" @click="handleCancel">{{ t('common.cancel') }}</NButton>
-                        <NButton size="small" type="primary" @click="handleSave" :loading="saving"
-                            :disabled="!formData.content.trim()">
-                            {{ isEdit ? t('promptManagement.update') : t('promptManagement.create') }}
-                        </NButton>
+                        <!-- 校验不通过（正文为空）：禁用 + 红色标注，悬停显示原因 -->
+                        <NTooltip :disabled="!promptValidationIssues.length" trigger="hover" placement="bottom">
+                            <template #trigger>
+                                <NButton size="small" type="primary" @click="handleSave" :loading="saving"
+                                    :class="{ 'save-btn--error': !!promptValidationIssues.length }"
+                                    :disabled="!formData.content.trim()">
+                                    {{ isEdit ? t('promptManagement.update') : t('promptManagement.create') }}
+                                </NButton>
+                            </template>
+                            <span v-for="issue in promptValidationIssues" :key="issue">{{ issue }}</span>
+                        </NTooltip>
                     </NFlex>
                 </div>
             </NFlex>
@@ -310,7 +342,7 @@
                                                             <NTag size="small"
                                                                 :type="variable.type === 'text' ? 'default' : 'info'">
                                                                 {{ variable.type === 'text' ? t('promptManagement.text')
-                                                                    : t('promptManagement.select') }}
+                                                                    : t('promptEditor.typeSelect') }}
                                                             </NTag>
                                                         </NFlex>
                                                         <NFlex>
@@ -509,9 +541,10 @@ import {
     NImage,
     NP,
     useMessage,
-    useDialog,
 } from "naive-ui";
-import { Plus, Trash, Eye, ArrowBackUp, History, Settings, Code, Photo } from "@vicons/tabler";
+import { Plus, Trash, Eye, ArrowBackUp, ArrowForwardUp, History, Settings, Code, Photo } from "@vicons/tabler";
+import { useUndoRedo } from "@/composables/useUndoRedo";
+import { clearDraft, loadDraft, saveDraft } from "@/composables/useFormDraft";
 import { api } from "@/lib/api";
 import { useWindowSize } from "@/composables/useWindowSize";
 import { useTagColors } from "@/composables/useTagColors";
@@ -520,6 +553,7 @@ import AIModelSelector from "@/components/common/AIModelSelector.vue";
 import RegularPromptEditor from "@/components/prompt-management/RegularPromptEditor.vue";
 import JinjaPromptEditor from "@/components/prompt-management/JinjaPromptEditor.vue";
 import type { PromptHistory } from "@/lib/db";
+import type { VariableDecor, VariableDisplayRule, VariableOptionMeta, VariableSkuConfig } from "@shared/types/database";
 import { jinjaService } from "@/lib/utils/jinja.service";
 
 // 统一变量类型定义
@@ -533,6 +567,14 @@ interface Variable {
     required: boolean;
     placeholder?: string;
     description?: string;
+    /** 选项级图标/配图（select 列表项，可「引用上级」） */
+    optionMeta?: Record<string, VariableOptionMeta>;
+    /** SKU 组合生成器配置 */
+    sku?: VariableSkuConfig;
+    /** 变量级图标/配图（所有类型均可用） */
+    decor?: VariableDecor;
+    /** 显示规则：变量写进正文时的前后缀形态（本提示词内覆盖） */
+    displayRule?: VariableDisplayRule;
 }
 
 interface Props {
@@ -556,7 +598,6 @@ const emit = defineEmits<Emits>();
 const { t } = useI18n()
 const { getTagColor, getTagsArray } = useTagColors()
 const message = useMessage();
-const dialog = useDialog();
 const formRef = ref();
 const contentScrollbarRef = ref(); // 内容区域滚动条引用
 const saving = ref(false);
@@ -687,6 +728,10 @@ const createComparableFormState = (includeVariables = true) => ({
             required: variable.required !== false,
             placeholder: variable.placeholder || "",
             description: variable.description || "",
+            optionMeta: JSON.stringify(variable.optionMeta ?? null),
+            sku: JSON.stringify(variable.sku ?? null),
+            decor: JSON.stringify(variable.decor ?? null),
+            displayRule: JSON.stringify(variable.displayRule ?? null),
         }))
         : undefined,
     isJinjaEnabled: isJinjaEnabled.value,
@@ -765,7 +810,7 @@ const displayTitle = computed(() => {
 
 const variableTypeOptions = [
     { label: t('promptManagement.text'), value: 'text' },
-    { label: t('promptManagement.select'), value: 'select' },
+    { label: t('promptEditor.typeSelect'), value: 'select' },
 ];
 
 // 表单验证规则
@@ -1596,6 +1641,10 @@ watch(
                                     .map((opt: string) => opt.trim())
                                     .filter((opt: string) => opt)
                                 : [],
+                        optionMeta: v.optionMeta && typeof v.optionMeta === "object" ? v.optionMeta : undefined,
+                        sku: v.sku && typeof v.sku === "object" ? v.sku : undefined,
+                        decor: v.decor && typeof v.decor === "object" ? v.decor : undefined,
+                        displayRule: v.displayRule && typeof v.displayRule === "object" ? v.displayRule : undefined,
                         defaultValue: v.defaultValue || "",
                         required: v.required !== false,
                         placeholder: v.placeholder || "",
@@ -2055,6 +2104,16 @@ const handleSave = async () => {
                             v.options.length > 0
                             ? v.options.filter((opt) => opt.trim())
                             : undefined,
+                    optionMeta:
+                        v.type === "select" && v.optionMeta && Object.keys(v.optionMeta).length > 0
+                            ? v.optionMeta
+                            : undefined,
+                    sku: v.type === "select" && v.sku ? v.sku : undefined,
+                    decor:
+                        v.decor && Object.keys(v.decor).length > 0
+                            ? v.decor
+                            : undefined,
+                    displayRule: v.displayRule ? v.displayRule : undefined,
                     defaultValue: v.defaultValue || undefined,
                     required: v.required,
                     placeholder: v.placeholder || undefined,
@@ -2125,6 +2184,8 @@ const handleSave = async () => {
                 },
             });
             message.success(t('promptManagement.updateSuccess'));
+            clearDraft(promptDraftKey.value);
+            promptUndoFlush();
             await loadHistory();
         } else {
             // 新建模式
@@ -2134,6 +2195,7 @@ const handleSave = async () => {
             };
             savedPrompt = await api.prompts.create.mutate(createData);
             message.success(t('promptManagement.createSuccess'));
+            clearDraft('prompt:new');
         }
 
         markFormClean();
@@ -2158,10 +2220,121 @@ const handleSave = async () => {
     }
 };
 
+// ---------------------------------------------------------------- 草稿自动保存 + 撤销/恢复
+const promptDraftKey = computed(() => `prompt:${props.prompt?.id ?? 'new'}`);
+const promptDraftRestoredAt = ref(0);
+const promptDraftRestoredText = computed(() =>
+    promptDraftRestoredAt.value ? new Date(promptDraftRestoredAt.value).toLocaleString() : '');
+/** 校验问题：正文为空时不允许保存 */
+const promptValidationIssues = computed(() =>
+    formData.value.content.trim() ? [] : [t('promptManagement.issueContentRequired')]);
+
+/** 草稿/撤销快照只含可序列化字段（图片 Blob 不落草稿） */
+const serializePromptForm = () => JSON.stringify({
+    title: formData.value.title,
+    description: formData.value.description,
+    content: formData.value.content,
+    categoryId: formData.value.categoryId,
+    tags: [...formData.value.tags],
+    variables: formData.value.variables,
+    isJinjaEnabled: isJinjaEnabled.value,
+});
+
+const applyPromptFormState = (state: Record<string, unknown>) => {
+    isInitializing.value = true;
+    formData.value.title = (state.title as string) ?? '';
+    formData.value.description = (state.description as string) ?? '';
+    formData.value.content = (state.content as string) ?? '';
+    formData.value.categoryId = (state.categoryId as number | null) ?? null;
+    formData.value.tags = Array.isArray(state.tags) ? [...state.tags as string[]] : [];
+    formData.value.variables = Array.isArray(state.variables)
+        ? (state.variables as Variable[]).map(variable => ({
+            ...variable,
+            decor: variable.decor ? { ...variable.decor } : undefined,
+            displayRule: variable.displayRule ? { ...variable.displayRule } : undefined,
+        }))
+        : [];
+    isJinjaEnabled.value = Boolean(state.isJinjaEnabled);
+    nextTick(() => { isInitializing.value = false; });
+};
+
+const {
+    canUndo: promptCanUndo,
+    canRedo: promptCanRedo,
+    scheduleChange: promptScheduleChange,
+    undo: promptUndo,
+    redo: promptRedo,
+    reset: promptUndoReset,
+    flush: promptUndoFlush,
+} = useUndoRedo({
+    serialize: serializePromptForm,
+    apply: snapshot => {
+        try {
+            applyPromptFormState(JSON.parse(snapshot));
+        } catch {
+            // 快照损坏时忽略
+        }
+    },
+});
+
+let promptDraftTimer: ReturnType<typeof setTimeout> | null = null;
+watch(
+    () => [formData.value.title, formData.value.description, formData.value.content,
+        formData.value.categoryId, formData.value.tags, formData.value.variables, isJinjaEnabled.value],
+    () => {
+        if (isInitializing.value || !props.show) return;
+        promptScheduleChange();
+        if (promptDraftTimer !== null) clearTimeout(promptDraftTimer);
+        promptDraftTimer = setTimeout(() => {
+            promptDraftTimer = null;
+            try {
+                saveDraft(promptDraftKey.value, JSON.parse(serializePromptForm()));
+            } catch {
+                // 序列化失败静默
+            }
+        }, 600);
+    },
+    { deep: true }
+);
+
+/** 打开后恢复草稿（若有），撤销栈以此为基线 */
+watch(
+    () => [props.show, props.prompt?.id] as const,
+    ([show]) => {
+        if (!show) return;
+        nextTick(() => {
+            const draft = loadDraft<Record<string, unknown>>(promptDraftKey.value);
+            if (draft?.data) {
+                applyPromptFormState(draft.data);
+                promptDraftRestoredAt.value = draft.savedAt;
+            } else {
+                promptDraftRestoredAt.value = 0;
+            }
+            promptUndoReset();
+        });
+    },
+    { immediate: true }
+);
+
+const discardPromptDraft = () => {
+    clearDraft(promptDraftKey.value);
+    promptDraftRestoredAt.value = 0;
+    message.success(t('promptManagement.draftDiscarded'));
+};
+
 const handleEditorShortcut = (event: KeyboardEvent) => {
-    if (!props.embedded || !props.show || !(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's') return;
-    event.preventDefault();
-    if (!saving.value && formData.value.content.trim()) handleSave();
+    if (!props.embedded || !props.show || !(event.metaKey || event.ctrlKey) || event.altKey) return;
+    const key = event.key.toLowerCase();
+    if (key === 's') {
+        event.preventDefault();
+        if (!saving.value && formData.value.content.trim()) handleSave();
+    } else if (key === 'z' && !event.shiftKey) {
+        event.preventDefault();
+        promptUndo();
+    } else if ((key === 'z' && event.shiftKey) || key === 'y') {
+        event.preventDefault();
+        promptRedo();
+    }
 };
 
 onMounted(() => window.addEventListener('keydown', handleEditorShortcut));
@@ -2174,41 +2347,10 @@ onBeforeUnmount(() => {
         clearTimeout(debounceTimer.value);
         debounceTimer.value = null;
     }
+    if (promptDraftTimer !== null) clearTimeout(promptDraftTimer);
 });
 
 // Jinja 相关方法
-const confirmContentReset = (content: string, onConfirm: () => void) => {
-    dialog.warning({
-        title: t('common.confirm'),
-        content,
-        positiveText: t('common.confirm'),
-        negativeText: t('common.cancel'),
-        onPositiveClick: onConfirm,
-    });
-};
-
-const toggleJinjaMode = () => {
-    if (isJinjaEnabled.value) {
-        // 从 Jinja 模式切换到变量模式
-        isJinjaEnabled.value = false;
-        message.info(t('promptManagement.jinjaDisabled'));
-    } else {
-        // 从变量模式切换到 Jinja 模式
-        if (formData.value.content.trim()) {
-            // 如果有现有内容，提示用户确认
-            confirmContentReset(t('promptManagement.jinjaClearContentMessage'), () => {
-                isJinjaEnabled.value = true;
-                formData.value.content = '';
-                formData.value.variables = [];
-                message.success(t('promptManagement.jinjaEnabled'));
-            });
-        } else {
-            // 没有内容，直接切换
-            isJinjaEnabled.value = true;
-            message.success(t('promptManagement.jinjaEnabled'));
-        }
-    }
-};
 
 const openJinjaWebsite = () => {
     // 打开 Jinja 官网
@@ -2225,41 +2367,19 @@ const regularEditorRef = ref();
 const jinjaEditorRef = ref();
 
 // 模式切换方法
+// 切换模式时保留内容和变量：Jinja 语法是纯文本超集，常规内容在 Jinja 编辑器中可直接使用；
+// 切回常规模式时 {{变量}} 占位符仍会被编辑器识别。
 const switchToRegularMode = () => {
     if (isJinjaEnabled.value) {
-        // 从 Jinja 模式切换到常规模式
-        if (formData.value.content.trim()) {
-            // 如果有现有内容，提示用户确认
-            confirmContentReset(t('promptManagement.regularModeClearContentMessage'), () => {
-                isJinjaEnabled.value = false;
-                formData.value.content = '';
-                formData.value.variables = [];
-                message.success(t('promptManagement.regularModeEnabled'));
-            });
-        } else {
-            // 没有内容，直接切换
-            isJinjaEnabled.value = false;
-            message.success(t('promptManagement.regularModeEnabled'));
-        }
+        isJinjaEnabled.value = false;
+        message.success(t('promptManagement.regularModeEnabled'));
     }
 };
 
 const switchToJinjaMode = () => {
     if (!isJinjaEnabled.value) {
-        // 从常规模式切换到 Jinja 模式
-        if (formData.value.content.trim()) {
-            // 如果有现有内容，提示用户确认
-            confirmContentReset(t('promptManagement.jinjaClearContentMessage'), () => {
-                isJinjaEnabled.value = true;
-                formData.value.content = '';
-                formData.value.variables = [];
-                message.success(t('promptManagement.jinjaEnabled'));
-            });
-        } else {
-            // 没有内容，直接切换
-            isJinjaEnabled.value = true;
-            message.success(t('promptManagement.jinjaEnabled'));
-        }
+        isJinjaEnabled.value = true;
+        message.success(t('promptManagement.jinjaEnabled'));
     }
 };
 
@@ -2284,7 +2404,11 @@ const updateVariables = (newVariables: any[], source: "auto" | "user" = "user") 
                 newVar.defaultValue !== currentVar.defaultValue ||
                 newVar.placeholder !== currentVar.placeholder ||
                 newVar.description !== currentVar.description ||
-                JSON.stringify(newVar.options) !== JSON.stringify(currentVar.options);
+                JSON.stringify(newVar.options) !== JSON.stringify(currentVar.options) ||
+                JSON.stringify(newVar.optionMeta ?? null) !== JSON.stringify(currentVar.optionMeta ?? null) ||
+                JSON.stringify(newVar.sku ?? null) !== JSON.stringify(currentVar.sku ?? null) ||
+                JSON.stringify(newVar.decor ?? null) !== JSON.stringify(currentVar.decor ?? null) ||
+                JSON.stringify(newVar.displayRule ?? null) !== JSON.stringify(currentVar.displayRule ?? null);
         });
 
         if (!hasChanges) {
@@ -2296,6 +2420,10 @@ const updateVariables = (newVariables: any[], source: "auto" | "user" = "user") 
         name: v.name,
         type: v.type,
         options: v.options,
+        optionMeta: v.optionMeta,
+        sku: v.sku,
+        decor: v.decor,
+        displayRule: v.displayRule,
         defaultValue: v.defaultValue,
         required: v.required,
         placeholder: v.placeholder,
@@ -2326,7 +2454,7 @@ defineExpose({
 </script>
 
 <style scoped>
-.edit-workspace-form { width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.edit-workspace-form { width: 100%; height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; font-family: var(--font-prompt); }
 .edit-workspace-tabs { flex: 1 1 0; width: 100%; height: 100%; min-height: 0; overflow: hidden; }
 .edit-workspace-tabs :deep(> .n-tabs-nav) { flex: 0 0 auto; }
 .edit-workspace-tabs :deep(.n-tabs-pane-wrapper) { width: 100%; }
@@ -2382,5 +2510,14 @@ defineExpose({
 .prompt-edit-embedded :deep(.edit-history-panel > .n-card-header) {
     min-height: 52px;
     border-bottom: 1px solid var(--border-default);
+}
+
+/* 校验不通过的保存按钮：显著红色标注 */
+.save-btn--error {
+    background: var(--error-color, #d33);
+}
+
+.draft-discard-link {
+    margin-left: 8px;
 }
 </style>

@@ -171,6 +171,21 @@ export const AI_PROVIDER_METADATA: Record<AIProviderType, AIProviderMetadata> = 
     ],
     testModelPriority: ['qwen3.6-flash', 'qwen-turbo-latest', 'qwen3.6-plus']
   },
+  qianwen: {
+    type: 'qianwen',
+    displayName: '千问AI TokenPlan',
+    defaultBaseURL: 'https://token-plan.maas.qianwenaiapi.com/compatible-mode/v1',
+    apiKeyUrl: 'https://platform.qianwenai.com/api-reference/preparation/api-key',
+    docUrl: 'https://platform.qianwenai.com/docs',
+    defaultModels: [
+      'qwen3.8-max',
+      'qwen3.7-plus',
+      'qwen3.8-flash',
+      'qwen-vl-max',
+      'qwen-vl-plus'
+    ],
+    testModelPriority: ['qwen3.8-flash', 'qwen3.7-plus', 'qwen3.8-max']
+  },
   zhipu: {
     type: 'zhipu',
     displayName: '智谱AI',

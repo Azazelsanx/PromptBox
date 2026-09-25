@@ -1,4 +1,6 @@
 import { Ollama } from '@langchain/ollama';
+import { ChatOpenAI } from '@langchain/openai';
+import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { AIConfig, AIGenerationRequest, AIGenerationResult } from '@shared/types/ai';
 import { BaseAIProvider, AITestResult, AIIntelligentTestResult, AIModelTestResult } from './base-provider';
 
@@ -345,5 +347,67 @@ export class OllamaProvider extends BaseAIProvider {
     }
   }
 
+  /**
+   * Bot 图片逆向提示词
+   * 走 Ollama 的 OpenAI 兼容端点（/v1/chat/completions），vision 模型支持 image_url 格式
+   */
+  async reversePromptFromImage(options: {
+    config: AIConfig;
+    instruction: string;
+    imageDataUrl: string;
+    model?: string;
+    signal?: AbortSignal;
+    onProgress?: (partial: string) => void;
+  }): Promise<{ prompt: string; model: string }> {
+    const { config, instruction, imageDataUrl, signal, onProgress } = options;
 
-} 
+    if (!config.enabled) {
+      throw new Error('配置已禁用');
+    }
+
+    const model = options.model || config.defaultModel || config.customModel;
+    if (!model) {
+      throw new Error('未指定模型');
+    }
+
+    const baseUrl = config.baseURL || 'http://localhost:11434';
+    const finalBaseUrl = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
+
+    try {
+      const llm = new ChatOpenAI({
+        openAIApiKey: 'ollama', // Ollama 本地不校验 API key，占位即可
+        modelName: model,
+        configuration: {
+          baseURL: finalBaseUrl
+        }
+      });
+
+      const systemPrompt = [
+        '你是专业的 AI 绘画提示词工程师。',
+        '用户会给你一张图片，请严格按照用户的要求，逆向推导出可以生成这张图片的提示词。',
+        '只输出提示词本身，不要输出任何解释、前言、引号或多余内容。'
+      ].join('\n');
+
+      const userInstruction = instruction?.trim()
+        || '请逆向这张图片的 AI 绘画提示词，要求细节完整、可直接用于文生图。';
+
+      const messages = [
+        new SystemMessage({ content: systemPrompt }),
+        new HumanMessage({
+          content: [
+            { type: 'text', text: userInstruction },
+            { type: 'image_url', image_url: { url: imageDataUrl } }
+          ]
+        })
+      ];
+
+      const prompt = await this.consumeReverseStream(llm, messages, signal, onProgress);
+      return { prompt, model };
+    } catch (error: any) {
+      console.error('Ollama 图片逆向提示词失败:', error);
+      throw new Error(this.buildReversePromptError(error));
+    }
+  }
+
+
+}

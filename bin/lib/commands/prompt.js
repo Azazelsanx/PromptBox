@@ -142,7 +142,7 @@ function register(program) {
         '      --content "Summarize the changes for {{product}} version {{version}}." \\\n' +
         '      --category Writing --tags "release,writing"\n' +
         '  $ ai-gist prompt variable sync <id-from-above>\n' +
-        '  $ ai-gist prompt fill <id-from-above> --var product="AI Gist" --var version=2.1.0\n'
+        '  $ ai-gist prompt fill <id-from-above> --var product="PromptBox" --var version=2.1.0\n'
     )
     .action(
       handler(async options => {

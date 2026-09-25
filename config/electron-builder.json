@@ -1,6 +1,6 @@
 {
     "appId": "com.yarinz.aigist",
-    "productName": "AI Gist",
+    "productName": "PromptBox",
     "directories": {
         "output": "dist",
         "buildResources": "resources"
@@ -62,33 +62,33 @@
         "oneClick": false,
         "perMachine": false,
         "allowToChangeInstallationDirectory": true,
-        "shortcutName": "AI Gist",
+        "shortcutName": "PromptBox",
         "installerIcon": "src/assets/windows.ico",
         "uninstallerIcon": "src/assets/windows.ico"
     },
     "win": {
         "target": "nsis",
         "icon": "src/assets/windows.ico",
-        "artifactName": "AI-Gist-${version}-Windows-Setup.${ext}"
+        "artifactName": "PromptBox-${version}-Windows-Setup.${ext}"
     },
     "appx": {
         "applicationId": "AIGist",
         "identityName": "YarinZ.AIGist-PromptManager",
         "publisher": "CN=B0E00209-75E9-44EE-B4B3-F71D2E3B4634",
         "publisherDisplayName": "Yarin Z",
-        "displayName": "AI Gist",
+        "displayName": "PromptBox",
         "backgroundColor": "#1E293B",
         "languages": [
             "zh-CN",
             "en-US",
             "it-IT"
         ],
-        "artifactName": "AI-Gist-${version}-Windows-Store-${arch}.${ext}"
+        "artifactName": "PromptBox-${version}-Windows-Store-${arch}.${ext}"
     },
     "mac": {
         "target": "dmg",
         "icon": "src/assets/macos.icns",
-        "artifactName": "AI-Gist-${version}-macOS-${arch}.${ext}",
+        "artifactName": "PromptBox-${version}-macOS-${arch}.${ext}",
         "hardenedRuntime": true,
         "entitlements": "resources/entitlements.mac.plist",
         "entitlementsInherit": "resources/entitlements.mac.plist"
@@ -97,7 +97,7 @@
         "appId": "com.getaigist.app",
         "target": "mas",
         "icon": "src/assets/macos.icns",
-        "artifactName": "AI-Gist-${version}-Mac-App-Store-${arch}.${ext}",
+        "artifactName": "PromptBox-${version}-Mac-App-Store-${arch}.${ext}",
         "extendInfo": {
             "ITSAppUsesNonExemptEncryption": false
         },
@@ -131,13 +131,13 @@
             "width": 540,
             "height": 480
         },
-        "title": "AI Gist ${version}"
+        "title": "PromptBox ${version}"
     },
     "linux": {
         "target": [
             "AppImage"
         ],
         "icon": "src/assets/linux.png",
-        "artifactName": "AI-Gist-${version}-linux.${ext}"
+        "artifactName": "PromptBox-${version}-linux.${ext}"
     }
 }

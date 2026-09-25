@@ -1,4 +1,5 @@
 import { ChatOpenAI } from '@langchain/openai';
+import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { AIConfig, AIGenerationRequest, AIGenerationResult } from '@shared/types/ai';
 import {
   getConfiguredBaseURL,
@@ -130,26 +131,34 @@ export class OpenAICompatibleProvider extends BaseAIProvider {
   }
 
   /**
-   * 获取可用模型列表
+   * 获取可用模型列表及其来源（remote=远端真实列表；default=远端不可用，回退内置默认）
    */
-  async getAvailableModels(config: AIConfig): Promise<string[]> {
+  async getAvailableModelsWithSource(config: AIConfig): Promise<{ models: string[]; modelSource: 'remote' | 'default' }> {
     console.log(`获取 ${config.type} 模型列表 - baseURL: ${config.baseURL}`);
-    
+
     if (this.providersWithoutModelList.has(config.type)) {
-      return this.getDefaultModels(config.type);
+      return { models: this.getDefaultModels(config.type), modelSource: 'default' };
     }
 
     try {
       const models = await this.fetchRemoteModels(config);
       if (models.length > 0) {
-        return models;
+        return { models, modelSource: 'remote' };
       }
     } catch (error) {
       console.error(`获取 ${config.type} 模型列表失败，使用默认列表:`, error);
     }
-    
+
     // 返回常见的模型作为后备
-    return this.getDefaultModels(config.type);
+    return { models: this.getDefaultModels(config.type), modelSource: 'default' };
+  }
+
+  /**
+   * 获取可用模型列表
+   */
+  async getAvailableModels(config: AIConfig): Promise<string[]> {
+    const { models } = await this.getAvailableModelsWithSource(config);
+    return models;
   }
 
   /**
@@ -427,13 +436,70 @@ export class OpenAICompatibleProvider extends BaseAIProvider {
     }
   }
 
+  /**
+   * Bot 图片逆向提示词：把图片与 Bot 指令发给多模态模型（仅 OpenAI 兼容系）
+   */
+  async reversePromptFromImage(options: {
+    config: AIConfig;
+    instruction: string;
+    imageDataUrl: string;
+    model?: string;
+    signal?: AbortSignal;
+    onProgress?: (partial: string) => void;
+  }): Promise<{ prompt: string; model: string }> {
+    const { config, instruction, imageDataUrl, signal, onProgress } = options;
+
+    if (!config.enabled) {
+      throw new Error('配置已禁用');
+    }
+
+    const model = options.model || config.defaultModel || config.customModel;
+    if (!model) {
+      throw new Error('未指定模型');
+    }
+
+    try {
+      const llm = new ChatOpenAI({
+        openAIApiKey: config.apiKey,
+        modelName: model,
+        configuration: {
+          baseURL: this.getBaseURL(config) || undefined
+        }
+      });
+
+      const systemPrompt = [
+        '你是专业的 AI 绘画提示词工程师。',
+        '用户会给你一张图片，请严格按照用户的要求，逆向推导出可以生成这张图片的提示词。',
+        '只输出提示词本身，不要输出任何解释、前言、引号或多余内容。'
+      ].join('\n');
+
+      const userInstruction = instruction?.trim()
+        || '请逆向这张图片的 AI 绘画提示词，要求细节完整、可直接用于文生图。';
+
+      const messages = [
+        new SystemMessage({ content: systemPrompt }),
+        new HumanMessage({
+          content: [
+            { type: 'text', text: userInstruction },
+            { type: 'image_url', image_url: { url: imageDataUrl } }
+          ]
+        })
+      ];
+
+      const prompt = await this.consumeReverseStream(llm, messages, signal, onProgress);
+      return { prompt, model };
+    } catch (error: any) {
+      console.error(`${config.type} 图片逆向提示词失败:`, error);
+      throw new Error(this.buildReversePromptError(error));
+    }
+  }
+
 
 
   /**
    * 查找适合测试的模型
    * 优先选择文本对话模型，避免图像生成等特殊模型
-   */
-  private findSuitableTestModel(models: string[], providerType: AIConfig['type']): string {
+   */  private findSuitableTestModel(models: string[], providerType: AIConfig['type']): string {
     // 定义适合测试的模型关键词
     const suitableKeywords = [
       'chat', 'instruct', 'text', 'gpt', 'claude', 'gemini', 'qwen', 'glm', 'deepseek', 'mistral', 'hunyuan'
@@ -512,8 +578,8 @@ function buildOpenAICompatibleHeaders(config: AIConfig): Record<string, string> 
 
   if (config.type === 'openrouter') {
     headers['HTTP-Referer'] = 'https://getaigist.com';
-    headers['X-OpenRouter-Title'] = 'AI Gist';
-    headers['X-Title'] = 'AI Gist';
+    headers['X-OpenRouter-Title'] = 'PromptBox';
+    headers['X-Title'] = 'PromptBox';
   }
 
   return headers;

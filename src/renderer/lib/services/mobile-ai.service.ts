@@ -119,8 +119,8 @@ function buildOpenAICompatibleHeaders(config: AIConfig | { type: AIConfig['type'
 
   if (config.type === 'openrouter') {
     headers['HTTP-Referer'] = 'https://getaigist.com'
-    headers['X-OpenRouter-Title'] = 'AI Gist'
-    headers['X-Title'] = 'AI Gist'
+    headers['X-OpenRouter-Title'] = 'PromptBox'
+    headers['X-Title'] = 'PromptBox'
   }
 
   return headers
@@ -164,6 +164,7 @@ export async function intelligentTestAIConfig(config: AIConfig): Promise<{
       case 'zhipu':
       case 'tencent':
       case 'aliyun':
+      case 'qianwen':
         return await intelligentTestOpenAICompatible(config, model, testPrompt)
 
       case 'anthropic':
@@ -434,6 +435,7 @@ export async function testAIConfig(config: {
       case 'mistral':
       case 'tencent':
       case 'aliyun':
+      case 'qianwen':
       case 'zhipu':
         return await testOpenAICompatible(baseURL, apiKey, type)
 

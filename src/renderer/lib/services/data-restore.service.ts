@@ -12,6 +12,7 @@ export interface RestorePreview {
   quickOptimizationConfigs: number
   aiHistory: number
   settings: number
+  bots: number
   total: number
 }
 
@@ -36,7 +37,7 @@ export class DataRestoreService {
     }
     const knownFields = [
       'categories', 'prompts', 'promptVariables', 'promptHistories',
-      'aiConfigs', 'quickOptimizationConfigs', 'aiHistory', 'settings', 'syncTombstones'
+      'aiConfigs', 'quickOptimizationConfigs', 'aiHistory', 'settings', 'bots', 'syncTombstones'
     ]
     if (!knownFields.some(field => field in data)) {
       throw new Error('恢复数据不包含可恢复的数据表')
@@ -51,6 +52,7 @@ export class DataRestoreService {
       quickOptimizationConfigs: count('quickOptimizationConfigs'),
       aiHistory: count('aiHistory'),
       settings: count('settings'),
+      bots: count('bots'),
       total: 0
     }
     preview.total = Object.entries(preview)

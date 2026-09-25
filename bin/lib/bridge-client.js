@@ -1,9 +1,9 @@
 'use strict';
 
 /**
- * 与正在运行的 AI Gist 应用通信。
+ * 与正在运行的 PromptBox 应用通信。
  *
- * AI Gist 的数据只存在于桌面应用的渲染进程里，这个 CLI 是一个独立的 Node 进程，
+ * PromptBox 的数据只存在于桌面应用的渲染进程里，这个 CLI 是一个独立的 Node 进程，
  * 唯一的读写方式是通过应用内置的本地回环 HTTP 桥接服务器（默认关闭，需要用户在
  * 设置里手动开启）。应用启动时会把连接信息写到 ~/.ai-gist/cli-bridge.json。
  */
@@ -77,7 +77,7 @@ function httpInvoke(runtimeInfo, action, params) {
           try {
             payload = text ? JSON.parse(text) : {};
           } catch {
-            reject(new CliBridgeError('AI Gist returned an invalid response', 'BAD_RESPONSE'));
+            reject(new CliBridgeError('PromptBox returned an invalid response', 'BAD_RESPONSE'));
             return;
           }
 
@@ -94,12 +94,12 @@ function httpInvoke(runtimeInfo, action, params) {
 
     req.on('timeout', () => {
       req.destroy();
-      reject(new CliBridgeError('Request to AI Gist timed out', 'TIMEOUT'));
+      reject(new CliBridgeError('Request to PromptBox timed out', 'TIMEOUT'));
     });
 
     req.on('error', err => {
       if (err.code === 'ECONNREFUSED') {
-        reject(new CliBridgeError('Connection refused by AI Gist', 'CONNECTION_REFUSED'));
+        reject(new CliBridgeError('Connection refused by PromptBox', 'CONNECTION_REFUSED'));
       } else {
         reject(new CliBridgeError(err.message, 'NETWORK_ERROR'));
       }
@@ -111,14 +111,14 @@ function httpInvoke(runtimeInfo, action, params) {
 
 function tryAutoLaunchOnMac() {
   try {
-    // --args 之后的内容会作为命令行参数传给被启动/唤醒的 AI Gist 进程。如果 AI Gist
+    // --args 之后的内容会作为命令行参数传给被启动/唤醒的 PromptBox 进程。如果 PromptBox
     // 其实已经在跑（例如常驻在托盘），`open -a` 不会创建一个真正独立运行的新实例，
     // 而是会短暂拉起一个新的 Electron 进程，该进程在 requestSingleInstanceLock() 时
     // 输给已经在运行的实例，随即把自己的命令行参数通过 'second-instance' 事件转交
     // 给主实例后退出。带上这个标记，主进程就能识别出这只是 CLI 的探测性拉起，
     // 从而不弹出"AI-Gist 已在运行"的对话框（那个对话框和这次 CLI 调用本身毫无关系，
     // 只会让用户困惑）。见 single-instance-manager.ts 的 CLI_AUTO_LAUNCH_MARKER。
-    spawn('open', ['-a', 'AI Gist', '--args', AUTO_LAUNCH_MARKER], { stdio: 'ignore', detached: true }).unref();
+    spawn('open', ['-a', 'PromptBox', '--args', AUTO_LAUNCH_MARKER], { stdio: 'ignore', detached: true }).unref();
   } catch {
     // 尽力而为：静默失败，后面的轮询超时会给出统一的错误提示
   }
@@ -127,7 +127,7 @@ function tryAutoLaunchOnMac() {
 /**
  * 删除过期的运行时连接信息文件（如果存在）。
  *
- * 用于"文件存在但连接被拒绝"的场景：上一次 AI Gist 没有正常退出（崩溃/被强杀/断电），
+ * 用于"文件存在但连接被拒绝"的场景：上一次 PromptBox 没有正常退出（崩溃/被强杀/断电），
  * 留下的 port/token 已经没有任何进程在监听。如果不删除它，后续的 waitForRuntimeInfo()
  * 轮询会立刻读到这份旧文件、误以为一个新实例已经就位，从而完全跳过等待，
  * 拿着同一份失效信息再失败一次。删除后轮询才会真正等到新实例启动、覆盖写入新文件。
@@ -153,15 +153,15 @@ async function waitForRuntimeInfo(timeoutMs) {
 function buildNotRunningMessage(attemptedAutoLaunch) {
   const lines = [];
   if (attemptedAutoLaunch) {
-    lines.push('AI Gist 已尝试自动启动，但仍未检测到本地 CLI 桥接。');
-    lines.push('(Attempted to launch AI Gist automatically, but the local CLI bridge is still unreachable.)');
+    lines.push('PromptBox 已尝试自动启动，但仍未检测到本地 CLI 桥接。');
+    lines.push('(Attempted to launch PromptBox automatically, but the local CLI bridge is still unreachable.)');
   } else {
-    lines.push('未检测到正在运行的 AI Gist。');
-    lines.push('(AI Gist does not appear to be running.)');
+    lines.push('未检测到正在运行的 PromptBox。');
+    lines.push('(PromptBox does not appear to be running.)');
   }
   lines.push('');
   lines.push('请检查：/ Please check:');
-  lines.push('  1. AI Gist 是否已经打开 / AI Gist is open (it may be minimized to the tray)');
+  lines.push('  1. PromptBox 是否已经打开 / PromptBox is open (it may be minimized to the tray)');
   lines.push('  2. 设置 → 本地 CLI 中的"启用本地 CLI 访问"开关是否已打开');
   lines.push('     Settings → Local CLI → "Enable local CLI access" is turned on');
   return lines.join('\n');
@@ -180,7 +180,7 @@ async function invoke(action, params, options = {}) {
 
   const autoLaunchAndWait = async () => {
     attemptedAutoLaunch = true;
-    process.stderr.write('AI Gist 未运行，正在尝试启动… (Launching AI Gist…)\n');
+    process.stderr.write('PromptBox 未运行，正在尝试启动… (Launching PromptBox…)\n');
     tryAutoLaunchOnMac();
     return waitForRuntimeInfo(AUTO_LAUNCH_TIMEOUT_MS);
   };
@@ -201,7 +201,7 @@ async function invoke(action, params, options = {}) {
       throw error;
     }
 
-    // 运行时文件存在，但实际连接被拒绝：说明上一次 AI Gist 没有正常退出（崩溃、
+    // 运行时文件存在，但实际连接被拒绝：说明上一次 PromptBox 没有正常退出（崩溃、
     // 被强制杀死、断电等），留下的是一份过期的端口/token 信息，此时真实情况其实
     // 和"应用没在运行"完全一样。之前的实现会在这里直接报错、要求用户手动重开，
     // 这正是 issue #149 里"之前的 CLI 没关掉，再次打开时就会报错"的根因之一：
@@ -209,8 +209,8 @@ async function invoke(action, params, options = {}) {
     // 文件而放弃了自动拉起。这里改成：清掉过期文件，按同样的自动拉起流程重试一次。
     if (!autoLaunchEnabled || attemptedAutoLaunch) {
       throw new CliBridgeError(
-        'AI Gist 似乎已经退出（发现了过期的连接信息）。请重新打开 AI Gist 后重试。\n' +
-          '(AI Gist appears to have quit — stale connection info was found. Please reopen AI Gist and try again.)',
+        'PromptBox 似乎已经退出（发现了过期的连接信息）。请重新打开 PromptBox 后重试。\n' +
+          '(PromptBox appears to have quit — stale connection info was found. Please reopen PromptBox and try again.)',
         'APP_NOT_RUNNING'
       );
     }

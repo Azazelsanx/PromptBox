@@ -1267,7 +1267,7 @@ function buildOpenAIHeaders(config) {
   }
   if (getProviderType(config) === 'openrouter') {
     headers['HTTP-Referer'] = 'https://getaigist.com';
-    headers['X-Title'] = 'AI Gist';
+    headers['X-Title'] = 'PromptBox';
   }
   return headers;
 }
@@ -1675,7 +1675,7 @@ async function testAIModel({ config, model }) {
       request: {
         configId: config.configId || 'test',
         model: selectedModel,
-        topic: '请用一句话回复：AI Gist connection test'
+        topic: '请用一句话回复：PromptBox connection test'
       }
     });
     return {
@@ -1938,7 +1938,7 @@ function createWebServer(options = {}) {
 if (require.main === module) {
   const server = createWebServer();
   server.listen(PORT, () => {
-    console.log(`[web] AI Gist Web server listening on http://0.0.0.0:${PORT}`);
+    console.log(`[web] PromptBox Web server listening on http://0.0.0.0:${PORT}`);
     console.log(`[web] Serving static assets from ${WEB_ROOT}`);
   });
 }

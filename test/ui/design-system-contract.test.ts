@@ -13,11 +13,15 @@ const collectFiles = (directory: string): string[] => readdirSync(directory, { w
     return desktopExtensions.has(extname(entry.name)) ? [path] : [];
   });
 
-const desktopFiles = collectFiles(rendererRoot).filter(path => (
-  !path.includes('/pages/mobile/')
-  && !path.includes('/components/mobile/')
-  && !path.endsWith('/assets/styles/mobile.css')
-));
+const desktopFiles = collectFiles(rendererRoot).filter(path => {
+  // 归一化分隔符：Windows 上 path 是反斜杠，mobile 目录过滤靠正斜杠判断
+  const normalized = path.split('\\').join('/');
+  return (
+    !normalized.includes('/pages/mobile/')
+    && !normalized.includes('/components/mobile/')
+    && !normalized.endsWith('/assets/styles/mobile.css')
+  );
+});
 
 describe('desktop design-system contract', () => {
   it('keeps the AI design prompt discoverable for future agents', () => {
@@ -84,7 +88,9 @@ describe('desktop design-system contract', () => {
   });
 
   it('does not use numeric persistent shadows inside desktop Vue components', () => {
-    const numericShadow = /box-shadow:\s*(?!none\b|var\()[^;}]*(?:rgba?|#|\d+px)/;
+    // 前瞻内含 \s*：防止 \s* 回溯到零长度后把 "box-shadow: var(--token, 0 12px ...)"
+    // 这类带数值 fallback 的 token 引用误判为裸数值阴影。
+    const numericShadow = /box-shadow:\s*(?!\s*(?:none\b|var\())[^;}]*(?:rgba?|#|\d+px)/;
     const offenders = desktopFiles
       .filter(path => path.endsWith('.vue') && numericShadow.test(readFileSync(path, 'utf8')))
       .map(path => relative(root, path));

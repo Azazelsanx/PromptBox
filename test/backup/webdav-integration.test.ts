@@ -396,6 +396,7 @@ const mockExportData = {
   }],
   aiHistory:  [],
   settings:   [{ key: 'theme', value: 'dark', type: 'string', description: '' }],
+  bots: [],
   syncTombstones: [],
 }
 
@@ -504,6 +505,7 @@ function createRealisticBackupData(version: 'initial' | 'updated') {
       { key: 'theme', value: updated ? 'light' : 'dark', type: 'string', description: 'theme setting' },
       { key: 'cloud.sync.intervalMinutes', value: updated ? 5 : 15, type: 'number', description: 'sync interval' }
     ],
+    bots: [],
     syncTombstones: []
   }
 }
@@ -1297,6 +1299,7 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
           }
         ],
         promptHistories: [],
+        bots: [],
         syncTombstones: []
       }
       const database = {
@@ -1382,6 +1385,7 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
           }
         ],
         promptHistories: [],
+        bots: [],
         syncTombstones: []
       }
       const database = {
@@ -1477,6 +1481,7 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
         settings: [
           { key: 'theme', value: 'dark', type: 'string', description: 'theme setting' }
         ],
+        bots: [],
         syncTombstones: []
       }
       const emptyData = {
@@ -1488,6 +1493,7 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
         quickOptimizationConfigs: [],
         aiHistory: [],
         settings: [],
+        bots: [],
         syncTombstones: []
       }
 
@@ -1768,6 +1774,7 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
       const syncData = {
         ...mockExportData,
         promptHistories: [],
+        bots: [],
         syncTombstones: []
       }
       const deviceADatabase = {
@@ -1794,6 +1801,7 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
             quickOptimizationConfigs: [],
             aiHistory: [],
             settings: [],
+            bots: [],
             syncTombstones: []
           }
         }),
@@ -1857,6 +1865,7 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
       const syncData = {
         ...mockExportData,
         promptHistories: [],
+        bots: [],
         syncTombstones: []
       }
       const deviceDatabase = {
@@ -1942,6 +1951,7 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
           { ...mockExportData.prompts[0], title: 'Recovered from snapshot file' }
         ],
         promptHistories: [],
+        bots: [],
         syncTombstones: []
       }
       const remoteSnapshot = {
@@ -1972,6 +1982,7 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
             quickOptimizationConfigs: [],
             aiHistory: [],
             settings: [],
+            bots: [],
             syncTombstones: []
           }
         }),
@@ -2013,6 +2024,7 @@ describe('WebDAV 集成测试（真实 HTTP 服务器）', () => {
       const syncData = {
         ...mockExportData,
         promptHistories: [],
+        bots: [],
         syncTombstones: []
       }
       const deviceDatabase = {

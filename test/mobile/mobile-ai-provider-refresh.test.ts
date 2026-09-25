@@ -80,8 +80,8 @@ describe('mobile AI provider 2026 refresh', () => {
     const [, options] = fetchMock.mock.calls[0]
     expect((options as RequestInit).headers).toEqual(expect.objectContaining({
       'HTTP-Referer': 'https://getaigist.com',
-      'X-OpenRouter-Title': 'AI Gist',
-      'X-Title': 'AI Gist'
+      'X-OpenRouter-Title': 'PromptBox',
+      'X-Title': 'PromptBox'
     }))
   })
 

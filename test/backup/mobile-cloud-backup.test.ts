@@ -118,6 +118,7 @@ const mockExportData = {
   quickOptimizationConfigs: [],
   aiHistory: [],
   settings: [{ key: 'theme', value: 'dark', type: 'string', description: '' }],
+  bots: [],
   syncTombstones: [],
 }
 
@@ -658,6 +659,7 @@ describe('MobileCloudBackupService', () => {
             updatedAt: '2026-06-12T00:00:00.000Z'
           }
         ],
+        bots: [],
         syncTombstones: []
       }, 'ios-device', 'icloud-snapshot-rev')
 

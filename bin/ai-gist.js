@@ -14,11 +14,11 @@ const program = new Command();
 program
   .name('ai-gist')
   .description(
-    'Local CLI for AI Gist — create, read, update, and "挖空" (fill-in-the-blank) prompts ' +
+    'Local CLI for PromptBox — create, read, update, and "挖空" (fill-in-the-blank) prompts ' +
       'from the terminal, for use by coding agents (e.g. Claude Code) or shell scripts.\n\n' +
-      'AI Gist stores data only inside its desktop app, so this CLI talks to a running copy ' +
+      'PromptBox stores data only inside its desktop app, so this CLI talks to a running copy ' +
       'of the app over a local, token-authenticated loopback connection. That connection is ' +
-      'OFF by default — turn it on once in AI Gist under Settings → Local CLI → ' +
+      'OFF by default — turn it on once in PromptBox under Settings → Local CLI → ' +
       '"Enable local CLI access", then run "ai-gist status" to verify.'
   )
   .version(pkg.version)

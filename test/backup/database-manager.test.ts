@@ -63,6 +63,10 @@ const mockQuickOptService = {
   getAllQuickOptimizationConfigs: vi.fn(),
   createQuickOptimizationConfigFromBackup: vi.fn(),
 }
+const mockBotService = {
+  getInstance: vi.fn(),
+  getAllBots: vi.fn(),
+}
 
 vi.mock('~/lib/services/category.service', () => ({
   CategoryService: { getInstance: () => mockCategoryService }
@@ -81,6 +85,9 @@ vi.mock('~/lib/services/app-settings.service', () => ({
 }))
 vi.mock('~/lib/services/quick-optimization.service', () => ({
   QuickOptimizationService: { getInstance: () => mockQuickOptService }
+}))
+vi.mock('~/lib/services/bot.service', () => ({
+  BotService: { getInstance: () => mockBotService }
 }))
 
 // mock FileReader for blobToBase64
@@ -260,6 +267,7 @@ describe('DatabaseServiceManager', () => {
     mockQuickOptService.getAllQuickOptimizationConfigs.mockResolvedValue([mockQuickOptimizationConfig])
     mockAIHistoryService.getAllAIGenerationHistory.mockResolvedValue([mockAIHistory])
     mockAppSettingsService.getAllSettings.mockResolvedValue([mockSetting])
+    mockBotService.getAllBots.mockResolvedValue([])
 
     mockCategoryService.createCategory.mockResolvedValue({ ...mockCategory, id: 10 })
     mockCategoryService.upsertCategory.mockResolvedValue(undefined)

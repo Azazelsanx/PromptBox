@@ -72,11 +72,38 @@ const DATABASE_SCHEMA: Record<string, DatabaseStoreSchema> = {
       uuid: { keyPath: 'uuid', unique: true }
     }
   },
+  variableGroups: {
+    keyPath: 'id',
+    autoIncrement: true,
+    indexes: {
+      name: { keyPath: 'name', unique: false },
+      parentUuid: { keyPath: 'parentUuid', unique: false },
+      uuid: { keyPath: 'uuid', unique: true }
+    }
+  },
+  globalVariables: {
+    keyPath: 'id',
+    autoIncrement: true,
+    indexes: {
+      name: { keyPath: 'name', unique: false },
+      groupUuid: { keyPath: 'groupUuid', unique: false },
+      uuid: { keyPath: 'uuid', unique: true }
+    }
+  },
   promptHistories: {
     keyPath: 'id',
     autoIncrement: true,
     indexes: {
       promptId: { keyPath: 'promptId', unique: false },
+      version: { keyPath: 'version', unique: false },
+      uuid: { keyPath: 'uuid', unique: true }
+    }
+  },
+  variableHistories: {
+    keyPath: 'id',
+    autoIncrement: true,
+    indexes: {
+      variableUuid: { keyPath: 'variableUuid', unique: false },
       version: { keyPath: 'version', unique: false },
       uuid: { keyPath: 'uuid', unique: true }
     }
@@ -120,6 +147,16 @@ const DATABASE_SCHEMA: Record<string, DatabaseStoreSchema> = {
       key: { keyPath: 'key', unique: true }
     }
   },
+  bots: {
+    keyPath: 'id',
+    autoIncrement: true,
+    indexes: {
+      name: { keyPath: 'name', unique: false },
+      enabled: { keyPath: 'enabled', unique: false },
+      sortOrder: { keyPath: 'sortOrder', unique: false },
+      uuid: { keyPath: 'uuid', unique: true }
+    }
+  },
   [SYNC_TOMBSTONE_STORE]: {
     keyPath: 'id',
     autoIncrement: true,
@@ -144,7 +181,8 @@ const SYNC_COLLECTION_BY_STORE: Record<string, string> = {
   ai_configs: 'aiConfigs',
   quick_optimization_configs: 'quickOptimizationConfigs',
   ai_generation_history: 'aiHistory',
-  settings: 'settings'
+  settings: 'settings',
+  bots: 'bots'
 };
 
 /**
@@ -154,10 +192,10 @@ const SYNC_COLLECTION_BY_STORE: Record<string, string> = {
 export class BaseDatabaseService {
   protected db: IDBDatabase | null = null;
   protected readonly dbName = 'AIGistDB';
-  protected readonly dbVersion = 12; // 增加本地同步元数据存储，避免 localStorage 容量降级
+  protected readonly dbVersion = 15; // v15 新增 Bot 库（bots，AI 逆向提示词助手容器）
   protected initializationPromise: Promise<void> | null = null;
   protected isInitialized = false;
-  private currentDbVersion = 12; // 添加一个可变的版本号变量
+  private currentDbVersion = 15; // 与 dbVersion 保持一致
 
   /**
    * 初始化数据库连接

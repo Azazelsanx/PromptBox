@@ -22,8 +22,8 @@ function buildOpenAICompatibleHeaders(config: AIConfig): Record<string, string> 
 
   if (config.type === 'openrouter') {
     headers['HTTP-Referer'] = 'https://getaigist.com'
-    headers['X-OpenRouter-Title'] = 'AI Gist'
-    headers['X-Title'] = 'AI Gist'
+    headers['X-OpenRouter-Title'] = 'PromptBox'
+    headers['X-Title'] = 'PromptBox'
   }
 
   return headers
@@ -111,6 +111,7 @@ export class AIGeneratorService {
       case 'siliconflow':
       case 'tencent':
       case 'aliyun':
+      case 'qianwen':
       case 'zhipu':
       case 'mistral':
       case 'openrouter':

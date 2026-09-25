@@ -2,6 +2,7 @@ import { AppSettingsService } from './app-settings.service';
 import {
   localBackupService,
   createLocalBackupSemanticChecksum,
+  getDefaultLocalBackupDescription,
   type LocalBackupInfo
 } from './local-backup.service';
 import {
@@ -36,6 +37,7 @@ const BACKUP_STORE_NAMES: DataStoreName[] = [
   'quick_optimization_configs',
   'ai_generation_history',
   'settings',
+  'bots',
   'syncTombstones'
 ];
 
@@ -319,6 +321,7 @@ export class AutomaticBackupService {
     this.updateStatus({ status: 'backing-up', error: undefined, nextBackupAt: undefined });
     try {
       const result = await this.backupService.create({
+        description: getDefaultLocalBackupDescription('automatic'),
         backupType: 'automatic',
         trigger,
         retention: this.retention

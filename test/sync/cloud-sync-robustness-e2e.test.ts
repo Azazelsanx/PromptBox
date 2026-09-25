@@ -3688,6 +3688,7 @@ function createDataSet(input: {
     quickOptimizationConfigs: [],
     aiHistory: [],
     settings: [{ key: 'theme', value: input.settingValue || 'dark', type: 'string', updatedAt }],
+    bots: [],
     syncTombstones: []
   }
 }
@@ -3785,6 +3786,7 @@ function createRealisticDataSet(): CloudSyncDataSet {
       type: 'string',
       updatedAt: '2026-06-13T13:00:00.000Z'
     }],
+    bots: [],
     syncTombstones: []
   }
 }
@@ -3870,6 +3872,7 @@ function createOfflineNewDeviceData(): CloudSyncDataSet {
       type: 'string',
       updatedAt: '2026-06-13T14:30:00.000Z'
     }],
+    bots: [],
     syncTombstones: []
   }
 }
@@ -3926,6 +3929,7 @@ function emptyDataSet(): CloudSyncDataSet {
     quickOptimizationConfigs: [],
     aiHistory: [],
     settings: [],
+    bots: [],
     syncTombstones: []
   }
 }

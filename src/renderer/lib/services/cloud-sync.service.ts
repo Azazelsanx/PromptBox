@@ -93,6 +93,7 @@ const SYNC_STORE_NAMES: DataStoreName[] = [
   'quick_optimization_configs',
   'ai_generation_history',
   'settings',
+  'bots',
   'syncTombstones'
 ];
 
@@ -820,7 +821,8 @@ export class CloudSyncService {
       'aiConfigs',
       'quickOptimizationConfigs',
       'aiHistory',
-      'settings'
+      'settings',
+      'bots'
     ];
 
     for (const collection of collections) {

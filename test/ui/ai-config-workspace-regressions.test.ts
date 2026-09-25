@@ -78,6 +78,21 @@ describe('AI configuration workspace regressions', () => {
     expect(page).toContain('providerIcons')
   })
 
+  it('adds fetched models in batches and never fakes a successful remote fetch', () => {
+    const page = readRendererFile('pages/AIConfigPage.vue')
+    const manager = readFileSync('src/main/ai/ai-service-manager.ts', 'utf8')
+
+    // 批量添加：拉取结果进 fetchedModels，勾选后 union 并入，不再整体替换 formData.models
+    expect(page).toContain('fetchedModels = ref<string[]>([])')
+    expect(page).toContain('applySelectedFetchedModels')
+    expect(page).toContain("t('aiConfig.workspace.batchAddApply'")
+    expect(page).not.toContain('formData.models = models')
+    // modelSource 透传：回退默认列表时用 warning 提示，而不是伪装成拉取成功
+    expect(page).toContain('result.modelSource')
+    expect(page).toContain('modelFetchFallback')
+    expect(manager).toContain('getAvailableModelsWithSource')
+  })
+
   it('uses a single quick-optimization modal with an inline editor', () => {
     const modal = readRendererFile('components/ai/QuickOptimizationConfigModal.vue')
     const commonModal = readRendererFile('components/common/CommonModal.vue')

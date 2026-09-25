@@ -100,8 +100,10 @@ import type { PromptWithRelations } from '@shared/types/database'
 import AIModelSelector from '@/components/common/AIModelSelector.vue'
 import { api } from '@/lib/api'
 import {
+  applyGlobalLibraryDefinitions,
   createWorkspaceDraft, deriveWorkspaceVariables, getMissingRequiredVariables, renderWorkspacePrompt,
 } from '@/lib/utils/prompt-workspace'
+import { useGlobalVariableLibrary } from '@/lib/utils/global-variable-library'
 import { readPromptUsageHistory, recordPromptUsage, type PromptUsageRecord } from '@/lib/utils/prompt-usage'
 import PromptFillCanvas from './PromptFillCanvas.vue'
 
@@ -130,7 +132,11 @@ const shouldStop = ref(false)
 const imageUrls = ref<string[]>([])
 const historyPromptId = ref<number | null>(null)
 
-const variables = computed(() => deriveWorkspaceVariables(props.prompt))
+const { libraryVariables } = useGlobalVariableLibrary()
+const variables = computed(() => applyGlobalLibraryDefinitions(
+  deriveWorkspaceVariables(props.prompt),
+  libraryVariables.value
+))
 const missingVariables = computed(() => getMissingRequiredVariables(variables.value, props.draft))
 const rendered = computed(() => renderWorkspacePrompt(props.prompt, props.draft, variables.value))
 const canUse = computed(() => Boolean(rendered.value.content.trim()) && !missingVariables.value.length && !rendered.value.error)

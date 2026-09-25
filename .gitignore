@@ -34,3 +34,9 @@ docs/reference/
 
 # 多 worktree 协作方案的临时工作区
 .worktree/
+# 本机开发环境产物（换机/重装不需要）
+dev-*.log
+dev-task.log
+dev-start.bat*
+package-lock.json
+.workbuddy/

@@ -48,6 +48,11 @@ export const CLOUD_SYNC_COLLECTION_CONTRACT = {
     stableIdentityFields: ['key'],
     businessUniqueFields: ['key']
   },
+  bots: {
+    storeName: 'bots',
+    stableIdentityFields: ['uuid'],
+    businessUniqueFields: []
+  },
   syncTombstones: {
     storeName: 'syncTombstones',
     stableIdentityFields: ['recordKey'],

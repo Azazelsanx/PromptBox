@@ -156,7 +156,7 @@ import {
 } from 'ionicons/icons'
 import {
   Api, Atom, BrandGoogle, BrandOpenSource, BrandWindows, Circles, Cloud, DeviceDesktop,
-  LetterA, LetterD, LetterM, LetterT, LetterZ, Route
+  LetterA, LetterD, LetterM, LetterQ, LetterT, LetterZ, Route
 } from '@vicons/tabler'
 import { useI18n } from '~/composables/useI18n'
 import { api } from '~/lib/api'
@@ -183,6 +183,7 @@ const providerIcons: Record<AIProviderType, Component> = {
   tencent: LetterT,
   aliyun: Cloud,
   zhipu: LetterZ,
+  qianwen: LetterQ,
   openrouter: Route
 }
 

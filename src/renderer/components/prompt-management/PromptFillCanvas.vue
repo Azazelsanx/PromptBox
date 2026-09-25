@@ -81,6 +81,8 @@ import {
   getActivePromptVariables, getMissingPromptVariables, isEmptyPromptValue,
   parsePromptTemplate, renderPrompt,
 } from '@/lib/utils/prompt-template'
+import { applyGlobalLibraryDefinitions } from '@/lib/utils/prompt-workspace'
+import { useGlobalVariableLibrary } from '@/lib/utils/global-variable-library'
 import PromptVariableField from './PromptVariableField.vue'
 
 const props = withDefaults(defineProps<{
@@ -102,7 +104,11 @@ const { t } = useI18n()
 const canvasBody = ref<HTMLElement>()
 const touched = ref(new Set<string>())
 const viewMode = ref<'fill' | 'result'>('fill')
-const variables = computed(() => getActivePromptVariables(props.prompt))
+const { libraryVariables } = useGlobalVariableLibrary()
+const variables = computed(() => applyGlobalLibraryDefinitions(
+  getActivePromptVariables(props.prompt),
+  libraryVariables.value
+))
 const parsed = computed(() => parsePromptTemplate(props.prompt.content || ''))
 const variableByName = computed(() => new Map(variables.value.map(variable => [variable.name, variable])))
 const missing = computed(() => getMissingPromptVariables(variables.value, props.values))
@@ -158,7 +164,7 @@ defineExpose({
 </script>
 
 <style scoped>
-.prompt-fill-canvas { box-sizing: border-box; min-height: 0; height: 100%; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-primary); }
+.prompt-fill-canvas { box-sizing: border-box; min-height: 0; height: 100%; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-primary); font-family: var(--font-prompt); }
 .fill-toolbar { min-height: 46px; padding: 6px var(--compact-padding); display: flex; align-items: center; justify-content: space-between; gap: var(--compact-padding); border: 0; border-bottom: 1px solid var(--border-default); border-radius: 0; }
 .fill-view-switch { display: flex; align-items: center; gap: 4px; }
 .fill-progress { font-size: 12px; font-variant-numeric: tabular-nums; }
@@ -166,7 +172,7 @@ defineExpose({
 .fill-canvas-body { flex: 1; min-height: 0; overflow: auto; padding: var(--content-padding); user-select: text; -webkit-user-select: text; }
 .inline-prompt-document { width: 100%; color: var(--content-primary); font-size: 14px; line-height: var(--line-height-relaxed); white-space: pre-wrap; overflow-wrap: anywhere; }
 .final-prompt-result { width: 100%; }
-.final-prompt-result pre, .jinja-live-result pre { margin: 0; color: var(--content-primary); font: inherit; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 14px; line-height: var(--line-height-relaxed); white-space: pre-wrap; overflow-wrap: anywhere; }
+.final-prompt-result pre, .jinja-live-result pre { margin: 0; color: var(--content-primary); font: inherit; font-family: inherit; font-size: 14px; line-height: var(--line-height-relaxed); white-space: pre-wrap; overflow-wrap: anywhere; }
 .jinja-variable-shelf { width: 100%; margin: 0 0 var(--section-gap); padding: var(--content-padding); border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-secondary); }
 .shelf-description { display: block; margin-top: 2px; font-size: 13px; }
 .jinja-field-grid { margin-top: var(--content-padding); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--content-padding); }

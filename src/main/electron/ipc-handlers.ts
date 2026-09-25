@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import { shell } from 'electron';
+import { shell, net } from 'electron';
 import { preferencesManager } from './preferences-manager';
 import { windowManager } from './window-manager';
 import { themeManager } from './theme-manager';
@@ -191,6 +191,23 @@ class IpcHandlers {
     ipcMain.handle('ai:debug-prompt', async (_, prompt: string, config: any) => {
       return await aiServiceManager.processDebugPrompt(prompt, config);
     });
+
+    // Bot 图片逆向提示词（流式片段经 ai:reverse-progress 事件转发到渲染层）
+    ipcMain.handle('ai:reverse-prompt', async (event, request: { config: any; instruction: string; imageDataUrl: string; model?: string; taskId?: string }) => {
+      return await aiServiceManager.processReversePrompt({
+        ...request,
+        onProgress: (partial: string) => {
+          if (!event.sender.isDestroyed()) {
+            event.sender.send('ai:reverse-progress', { taskId: request.taskId, partial });
+          }
+        }
+      });
+    });
+
+    // 取消进行中的图片逆向任务
+    ipcMain.handle('ai:cancel-reverse-task', (_, taskId: string) => {
+      return aiServiceManager.cancelReverseTask(taskId);
+    });
   }
 
   /**
@@ -265,6 +282,31 @@ class IpcHandlers {
     // 删除文件
     ipcMain.handle('fs:unlink', async (_, { filePath }) => {
       return await fsService.unlink(filePath);
+    });
+
+    // 远程图片下载 → dataURL（主进程发起不受 CORS 限制，转本地加载）
+    ipcMain.handle('images:fetch-data-url', async (_, url: string) => {
+      try {
+        const parsed = new URL(url);
+        if (!['http:', 'https:'].includes(parsed.protocol)) {
+          return { ok: false as const, error: 'invalid-protocol' };
+        }
+        const response = await net.fetch(url, { signal: AbortSignal.timeout(15000) });
+        if (!response.ok) {
+          return { ok: false as const, error: `http-${response.status}` };
+        }
+        const contentType = (response.headers.get('content-type') || 'image/png').split(';')[0].trim();
+        if (!contentType.startsWith('image/')) {
+          return { ok: false as const, error: 'not-image' };
+        }
+        const buffer = Buffer.from(await response.arrayBuffer());
+        if (buffer.byteLength > 8 * 1024 * 1024) {
+          return { ok: false as const, error: 'too-large' };
+        }
+        return { ok: true as const, dataUrl: `data:${contentType};base64,${buffer.toString('base64')}` };
+      } catch (error) {
+        return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      }
     });
   }
 
@@ -486,6 +528,8 @@ class IpcHandlers {
     ipcMain.removeHandler('ai:generate-prompt-stream');
     ipcMain.removeHandler('ai:stop-generation');
     ipcMain.removeHandler('ai:debug-prompt');
+    ipcMain.removeHandler('ai:reverse-prompt');
+    ipcMain.removeHandler('ai:cancel-reverse-task');
     
     // 清理更新处理器
     ipcMain.removeHandler('app:get-version');

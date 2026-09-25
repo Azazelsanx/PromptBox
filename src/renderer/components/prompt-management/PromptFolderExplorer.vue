@@ -33,7 +33,9 @@
                     }" @click="navigateTo(category.id || null)" @dragover="handleDragOver($event, category.id || null)"
                     @dragleave="handleDragLeave($event, `category-${category.id}`)"
                     @drop="handleDrop($event, category.id || null)">
-                    <span class="folder-nav-color" :style="{ background: category.color || 'var(--content-tertiary)' }" />
+                    <component v-if="resolveIcon(category.icon)" :is="resolveIcon(category.icon)" class="folder-nav-icon"
+                        :theme="category.iconTheme || 'outline'" :size="14" :fill="category.color || undefined" />
+                    <span v-else class="folder-nav-color" :style="{ background: category.color || 'var(--content-tertiary)' }" />
                     <span class="folder-nav-name">{{ category.name }}</span>
                     <span class="folder-nav-count">{{ categoryCounts[category.id || 0] || 0 }}</span>
                 </button>
@@ -81,7 +83,9 @@
                         @dragleave="handleDragLeave($event, `category-${category.id}`)"
                         @drop="handleDrop($event, category.id || null)">
                         <div class="folder-icon" :style="{ color: category.color || 'var(--content-secondary)' }">
-                            <svg class="asset-glyph folder-glyph" viewBox="0 0 72 72" aria-hidden="true"
+                            <component v-if="resolveIcon(category.icon)" :is="resolveIcon(category.icon)"
+                                :theme="category.iconTheme || 'outline'" :size="30" :fill="category.color || undefined" />
+                            <svg v-else class="asset-glyph folder-glyph" viewBox="0 0 72 72" aria-hidden="true"
                                 focusable="false">
                                 <path d="M11 24v-1.5a6 6 0 0 1 6-6h11.7a6 6 0 0 1 4.35 1.87l4.7 4.95a4 4 0 0 0 2.9 1.25H55a6 6 0 0 1 6 6V52a6 6 0 0 1-6 6H17a6 6 0 0 1-6-6V24z"
                                     fill="currentColor" fill-opacity=".08" stroke="currentColor" />
@@ -164,6 +168,7 @@ import {
 import { useI18n } from 'vue-i18n'
 import type { CategoryWithRelations, PromptWithRelations } from '@shared/types/database'
 import { sortCategoriesByOrder } from '@/lib/utils/category-order'
+import { resolveIcon } from '@/lib/utils/icon-registry'
 
 interface Props {
     categories: CategoryWithRelations[]

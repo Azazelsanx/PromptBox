@@ -65,6 +65,7 @@
                                 :model-value="{ themeSource: settings.themeSource }"
                                 @update:model-value="(val) => { settings.themeSource = val.themeSource; updateSetting(); }" />
                             <LanguageSettings />
+                            <EditorBehaviorSettings />
                         </template>
 
                         <!-- 启动行为设置 -->
@@ -144,6 +145,7 @@ import ShortcutSettings from "@/components/settings/ShortcutSettings.vue";
 import NetworkProxySettings from "@/components/settings/NetworkProxySettings.vue";
 import CliBridgeSettings from "@/components/settings/CliBridgeSettings.vue";
 import LanguageSettings from "@/components/settings/LanguageSettings.vue";
+import EditorBehaviorSettings from "@/components/settings/EditorBehaviorSettings.vue";
 import { PlatformDetector } from "@shared/platform";
 import { preferencesClient } from "@/lib/platform/preferences";
 import { useTheme } from "~/composables/useTheme";

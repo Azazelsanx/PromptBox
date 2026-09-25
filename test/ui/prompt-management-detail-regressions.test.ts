@@ -283,7 +283,9 @@ describe('prompt management detail regressions', () => {
     // so it stays synchronous.
     expect(sidebar).toContain('const categoryPaneCollapsedForLayout = ref(isCategoryListCollapsed.value)')
     expect(sidebar).toMatch(/watch\(isCategoryListCollapsed,\s*\(collapsed\)\s*=>\s*\{\s*if\s*\(collapsed\)\s*\{\s*nextTick\(\(\)\s*=>\s*\{\s*categoryPaneCollapsedForLayout\.value\s*=\s*true\s*\}\)\s*\}\s*else\s*\{\s*categoryPaneCollapsedForLayout\.value\s*=\s*false\s*\}\s*\}\)/)
-    expect(sidebar).toContain("import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'")
+    // 不锁完整 import 签名：该行可能因新增无关具名导入（如 h）而变化，
+    // 这里只守卫「延迟一拍」机制所需的 nextTick 确实从 vue 导入。
+    expect(sidebar).toMatch(/import \{[^}]*\bnextTick\b[^}]*\} from 'vue'/)
     expect(sidebar).toContain(':disabled="categoryPaneCollapsedForLayout"')
     expect(sidebar).not.toContain(':disabled="isCategoryListCollapsed"')
   })

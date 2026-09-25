@@ -283,7 +283,7 @@ import {
 } from 'ionicons/icons'
 import {
   Api, Atom, BrandGoogle, BrandOpenSource, BrandWindows, Circles, Cloud, DeviceDesktop,
-  LetterA, LetterD, LetterM, LetterT, LetterZ, Route
+  LetterA, LetterD, LetterM, LetterQ, LetterT, LetterZ, Route
 } from '@vicons/tabler'
 import { useI18n } from '~/composables/useI18n'
 import { useAIConfigForm } from '~/composables/useAIConfigForm'
@@ -370,6 +370,10 @@ const getServiceInfoByType = (type: AIProviderType) => {
       name: '智谱AI',
       description: t('aiConfig.serviceDescriptions.zhipu')
     },
+    qianwen: {
+      name: '千问AI TokenPlan',
+      description: t('aiConfig.serviceDescriptions.qianwen')
+    },
     openrouter: {
       name: 'OpenRouter',
       description: t('aiConfig.serviceDescriptions.openrouter')
@@ -406,7 +410,7 @@ const showTypeModal = ref(false)
 const localTypeOrder: AIProviderType[] = ['ollama', 'lmstudio']
 const onlineTypeOrder: AIProviderType[] = [
   'openai', 'anthropic', 'google', 'azure', 'mistral',
-  'openrouter', 'deepseek', 'tencent', 'aliyun', 'zhipu', 'siliconflow'
+  'openrouter', 'deepseek', 'tencent', 'aliyun', 'zhipu', 'qianwen', 'siliconflow'
 ]
 
 // 卡片头像用的短缩写，仅作视觉标识，不引入新的配色体系
@@ -423,6 +427,7 @@ const providerInitials: Record<AIProviderType, string> = {
   tencent: '腾',
   aliyun: '阿',
   zhipu: '智',
+  qianwen: '千',
   siliconflow: '硅'
 }
 
@@ -441,6 +446,7 @@ const providerIcons: Record<AIProviderType, Component> = {
   tencent: LetterT,
   aliyun: Cloud,
   zhipu: LetterZ,
+  qianwen: LetterQ,
   openrouter: Route
 }
 

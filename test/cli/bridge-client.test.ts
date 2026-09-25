@@ -112,11 +112,11 @@ describe('bridge-client invoke() — stale runtime file recovery (issue #149)', 
     writeRuntimeFile({ port: deadPort, token: 'stale-token' })
 
     const freshServer = await startFakeBridgeServer()
-    // 模拟 `open -a "AI Gist"` 唤醒了一个新的应用实例：新实例启动后会覆盖
+    // 模拟 `open -a "PromptBox"` 唤醒了一个新的应用实例：新实例启动后会覆盖
     // 写入一份全新的、真正在监听的端口/token 信息。这里同步完成，让
     // waitForRuntimeInfo() 的第一次轮询就能读到，测试不需要真的等待。
     spawnMock.mockImplementation((_cmd: string, args: string[]) => {
-      expect(args).toEqual(['-a', 'AI Gist', '--args', bridgeClient.AUTO_LAUNCH_MARKER])
+      expect(args).toEqual(['-a', 'PromptBox', '--args', bridgeClient.AUTO_LAUNCH_MARKER])
       writeRuntimeFile({ port: freshServer.port, token: freshServer.token })
       return { unref: () => undefined }
     })
@@ -139,7 +139,7 @@ describe('bridge-client invoke() — stale runtime file recovery (issue #149)', 
 
     const freshServer = await startFakeBridgeServer()
     spawnMock.mockImplementation((_cmd: string, args: string[]) => {
-      expect(args).toEqual(['-a', 'AI Gist', '--args', bridgeClient.AUTO_LAUNCH_MARKER])
+      expect(args).toEqual(['-a', 'PromptBox', '--args', bridgeClient.AUTO_LAUNCH_MARKER])
       writeRuntimeFile({ port: freshServer.port, token: freshServer.token })
       return { unref: () => undefined }
     })

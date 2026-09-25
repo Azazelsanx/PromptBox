@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.getaigist.app',
-  appName: 'AI Gist',
+  appName: 'PromptBox',
   webDir: 'build/renderer',
   plugins: {
     SplashScreen: {

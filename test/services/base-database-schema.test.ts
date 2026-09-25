@@ -43,7 +43,7 @@ describe('BaseDatabaseService schema health and upgrades', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
   })
 
-  it('creates the complete v12 schema, including exact key paths and unique flags', async () => {
+  it('creates the complete v15 schema, including exact key paths and unique flags', async () => {
     const service = new InspectableDatabaseService()
     await service.initialize()
 
@@ -51,7 +51,7 @@ describe('BaseDatabaseService schema health and upgrades', () => {
 
     expect(health).toMatchObject({
       healthy: true,
-      currentVersion: 12,
+      currentVersion: 15,
       needsRepair: false,
       missingStores: [],
       schemaIssues: []
@@ -69,11 +69,21 @@ describe('BaseDatabaseService schema health and upgrades', () => {
       unique: true
     })
     expect(transaction.objectStore('syncMetadata').keyPath).toBe('key')
+    const variableTransaction = db.transaction(['variableGroups', 'globalVariables'], 'readonly')
+    expect(variableTransaction.objectStore('variableGroups').keyPath).toBe('id')
+    expect(variableTransaction.objectStore('variableGroups').index('uuid')).toMatchObject({ unique: true })
+    expect(variableTransaction.objectStore('globalVariables').keyPath).toBe('id')
+    expect(variableTransaction.objectStore('globalVariables').index('groupUuid')).toMatchObject({ unique: false })
+    const botTransaction = db.transaction(['bots'], 'readonly')
+    expect(botTransaction.objectStore('bots').keyPath).toBe('id')
+    expect(botTransaction.objectStore('bots').index('uuid')).toMatchObject({ unique: true })
     service.close()
   })
 
   it('reports store keyPath, index keyPath, and unique mismatches instead of only checking names', async () => {
-    const malformed = await openDatabase(12, db => {
+    // 预建库必须处于当前版本（15），否则 initialize 的升级路径会先抛
+    // DATABASE_STORE_KEY_PATH_MISMATCH，轮不到健康检查报告 schemaIssues。
+    const malformed = await openDatabase(15, db => {
       const categories = db.createObjectStore('categories', { keyPath: 'uuid' })
       categories.createIndex('name', 'label', { unique: false })
     })
@@ -167,7 +177,7 @@ describe('BaseDatabaseService schema health and upgrades', () => {
   })
 
   it('never deletes a malformed current-version database during repair', async () => {
-    const malformed = await openDatabase(12, db => {
+    const malformed = await openDatabase(15, db => {
       db.createObjectStore('categories', { keyPath: 'id', autoIncrement: true })
     })
     malformed.close()
@@ -191,7 +201,7 @@ describe('BaseDatabaseService schema health and upgrades', () => {
     const service = new InspectableDatabaseService()
 
     await expect(service.initialize()).rejects.toThrow(
-      /DATABASE_UPGRADE_BLOCKED.*从版本 11 升级到 12.*关闭其他应用窗口/
+      /DATABASE_UPGRADE_BLOCKED.*从版本 11 升级到 15.*关闭其他应用窗口/
     )
 
     blocker.close()
@@ -204,8 +214,21 @@ describe('BaseDatabaseService schema health and upgrades', () => {
     await service.initialize()
     expect(service.connection).not.toBeNull()
 
-    const newerDb = await openDatabase(13)
+    const newerDb = await openDatabase(16)
     expect(service.connection).toBeNull()
     newerDb.close()
+  })
+
+  it('rejects initialize when an upgrade encounters a store with a mismatched key path', async () => {
+    // 版本低于当前版本时，升级路径的 createObjectStores 会校验已存在 store 的
+    // 主键，不匹配直接抛 DATABASE_STORE_KEY_PATH_MISMATCH（健康检查兜不到）。
+    const malformed = await openDatabase(13, db => {
+      db.createObjectStore('categories', { keyPath: 'uuid' })
+    })
+    malformed.close()
+
+    const service = new InspectableDatabaseService()
+    await expect(service.initialize()).rejects.toThrow(/DATABASE_STORE_KEY_PATH_MISMATCH.*categories/)
+    service.close()
   })
 })

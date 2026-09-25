@@ -35,7 +35,7 @@
         </NTooltip>
         <NTooltip>
           <template #trigger>
-            <NButton size="small" :disabled="readonly" @click="$emit('request-add-variable')">
+            <NButton size="small" :disabled="readonly" @click="$emit('request-insert-variables')">
               <template #icon><NIcon size="16"><Braces /></NIcon></template>
               <span class="toolbar-button-label">{{ t('promptEditor.insertVariable') }}</span>
             </NButton>
@@ -51,13 +51,46 @@
       <NIcon size="16"><AlertTriangle /></NIcon>
       <span>{{ t('promptEditor.unclosedVariable', { count: diagnosticCount }) }}</span>
     </div>
+
+    <!-- 右键菜单：选区创建变量 / 插入已有变量 -->
+    <NDropdown trigger="manual" :show="contextMenu.show" :x="contextMenu.x" :y="contextMenu.y"
+      placement="bottom-start" :options="contextMenuOptions"
+      @select="handleContextMenuSelect" @clickoutside="closeContextMenu" />
+
+    <!-- 从选区创建变量 -->
+    <NModal :show="createModal.show" :mask-closable="false" display-directive="show"
+      @update:show="createModal.show = $event">
+      <div class="create-variable-modal" role="dialog" aria-modal="true">
+        <header class="create-variable-header">
+          <NText strong>{{ t('promptEditor.createFromSelectionTitle') }}</NText>
+        </header>
+        <p class="create-variable-hint">{{ t('promptEditor.createFromSelectionHint') }}</p>
+        <div class="create-variable-field">
+          <label class="create-variable-label">{{ t('promptManagement.variableName') }}</label>
+          <NInput v-model:value="createModal.name" :status="createModal.error ? 'error' : undefined"
+            @keyup.enter="confirmCreateVariable" />
+          <p v-if="createModal.error" class="create-variable-error">{{ createVariableErrorText }}</p>
+        </div>
+        <div class="create-variable-field">
+          <label class="create-variable-label">{{ t('promptManagement.variableType') }}</label>
+          <NSelect v-model:value="createModal.type" :options="createTypeOptions" />
+        </div>
+        <footer class="create-variable-actions">
+          <NButton size="small" quaternary @click="createModal.show = false">{{ t('common.cancel') }}</NButton>
+          <NButton size="small" type="primary" @click="confirmCreateVariable">{{ t('common.confirm') }}</NButton>
+        </footer>
+      </div>
+    </NModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NButton, NIcon, NText, NTooltip } from 'naive-ui'
+import {
+  NButton, NDropdown, NIcon, NInput, NModal, NSelect, NText, NTooltip,
+  type DropdownOption,
+} from 'naive-ui'
 import { AdjustmentsHorizontal, AlertTriangle, Braces, Code, LayoutCards } from '@vicons/tabler'
 import { autocompletion, type CompletionContext, type CompletionResult } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
@@ -70,7 +103,7 @@ import {
   WidgetType, type DecorationSet,
 } from '@codemirror/view'
 import type { EditablePromptVariable } from '@/lib/utils/prompt-template'
-import { parsePromptTemplate, validateVariableName } from '@/lib/utils/prompt-template'
+import { createVariable, insertVariableSnippet, parsePromptTemplate, validateVariableName } from '@/lib/utils/prompt-template'
 
 const props = withDefaults(defineProps<{
   content: string
@@ -81,6 +114,8 @@ const props = withDefaults(defineProps<{
   showVariablesButton?: boolean
   sourceOnly?: boolean
   variableCount?: number
+  /** 全局库变量（仅供右键菜单插入；由父组件传入） */
+  libraryVariables?: EditablePromptVariable[]
 }>(), {
   selectedVariable: '',
   readonly: false,
@@ -88,13 +123,15 @@ const props = withDefaults(defineProps<{
   showVariablesButton: false,
   sourceOnly: false,
   variableCount: undefined,
+  libraryVariables: () => [],
 })
 
 const emit = defineEmits<{
   'update:content': [value: string]
   'select-variable': [name: string]
-  'request-add-variable': []
+  'request-insert-variables': []
   'request-open-variables': []
+  'variable-created': [variable: EditablePromptVariable]
 }>()
 
 const { t } = useI18n()
@@ -233,7 +270,7 @@ const completionSource = (context: CompletionContext): CompletionResult | null =
 
 const editorTheme = EditorView.theme({
   '&': { height: '100%', backgroundColor: 'var(--surface-primary)', color: 'var(--content-primary)' },
-  '.cm-scroller': { overflow: 'auto', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', lineHeight: '1.7' },
+  '.cm-scroller': { overflow: 'auto', fontFamily: 'var(--font-prompt)', lineHeight: '1.7' },
   '.cm-content': { minHeight: '100%', padding: '16px', caretColor: 'var(--accent-primary)', fontSize: '14px' },
   '.cm-line': { padding: '0' },
   '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--accent-primary)' },
@@ -252,6 +289,21 @@ onMounted(() => {
       EditorView.lineWrapping,
       variableDecorations,
       variableAtomicRanges,
+      EditorView.domEventHandlers({
+        contextmenu: (event, view) => {
+          if (props.readonly) return false
+          const selection = view.state.selection.main
+          contextRange.value = { from: selection.from, to: selection.to }
+          contextSelectedText.value = view.state.doc.sliceString(selection.from, selection.to)
+          // 右键落在变量占位符上时，切换为变量操作菜单（删除/替换）
+          contextVariable.value = resolveVariableAt(view, event)
+          contextMenu.x = event.clientX
+          contextMenu.y = event.clientY
+          contextMenu.show = true
+          event.preventDefault()
+          return true
+        },
+      }),
       autocompletion({ override: [completionSource], activateOnTyping: true }),
       readonlyCompartment.of(EditorState.readOnly.of(props.readonly)),
       editorPlaceholder(props.placeholder),
@@ -288,17 +340,186 @@ const setVisualMode = (value: boolean) => {
   editorView?.focus()
 }
 
-const insertVariable = (name: string) => {
+/**
+ * 插入文本：按变量显示规则把「变量名」槽位字面化（如 `色调 {{色调}}`），
+ * 值槽位保留占位符（运行时才拿到选中项）。替换已有变量时只写占位符，
+ * 避免正文里残留的旧变量名与新变量名叠成两层。
+ */
+const variableSnippet = (name: string, withAffix: boolean) => {
+  if (!withAffix) return `{{${name}}}`
+  const variable = props.variables.find(item => item.name === name)
+    || (props.libraryVariables || []).find(item => item.name === name)
+  return insertVariableSnippet(variable?.displayRule, name)
+}
+
+const insertVariableInRange = (name: string, range?: { from: number; to: number }, withAffix = true) => {
   if (!editorView || props.readonly) return
-  const selection = editorView.hasFocus ? editorView.state.selection.main : lastSelection.main
-  const placeholder = `{{${name}}}`
+  const selection = range ?? (editorView.hasFocus ? editorView.state.selection.main : lastSelection.main)
+  const snippet = variableSnippet(name, withAffix)
   editorView.dispatch({
-    changes: { from: selection.from, to: selection.to, insert: placeholder },
-    selection: { anchor: selection.from + placeholder.length },
+    changes: { from: selection.from, to: selection.to, insert: snippet },
+    selection: { anchor: selection.from + snippet.length },
     scrollIntoView: true,
   })
   emit('select-variable', name)
   editorView.focus()
+}
+
+const insertVariable = (name: string) => insertVariableInRange(name)
+
+// ---------------------------------------------------------------- 右键菜单
+
+const contextMenu = reactive({ show: false, x: 0, y: 0 })
+const contextRange = ref({ from: 0, to: 0 })
+const contextSelectedText = ref('')
+/** 右键命中的变量占位符；命中时菜单切换为删除/替换操作 */
+const contextVariable = ref<{ name: string; from: number; to: number } | null>(null)
+const createModal = reactive({ show: false, name: '', type: 'text', error: '' })
+
+/** 计算右键坐标命中的变量段；未命中返回 null */
+const resolveVariableAt = (view: EditorView, event: MouseEvent) => {
+  const pos = view.posAtCoords({ x: event.clientX, y: event.clientY })
+  if (pos == null || pos < 0) return null
+  const parsed = parsePromptTemplate(view.state.doc.toString())
+  for (const segment of parsed.segments) {
+    if (segment.kind !== 'variable') continue
+    if (pos >= segment.start && pos <= segment.end) {
+      return { name: segment.name, from: segment.start, to: segment.end }
+    }
+  }
+  return null
+}
+
+const insertablePromptVariables = computed(() => props.variables.filter(variable => variable.name))
+const insertableLibraryVariables = computed(() => (props.libraryVariables || [])
+  .filter(variable => variable.name && !props.variables.some(local => local.name === variable.name)))
+
+/** 替换目标：提示词变量 + 全局库变量，排除被替换变量自身 */
+const replaceableVariables = computed(() => [
+  ...insertablePromptVariables.value,
+  ...insertableLibraryVariables.value,
+].filter(variable => variable.name !== contextVariable.value?.name))
+
+const contextMenuOptions = computed<DropdownOption[]>(() => {
+  if (contextVariable.value) {
+    return [
+      {
+        label: t('promptEditor.contextReplaceVariable', { name: contextVariable.value.name }),
+        key: 'replace-variable',
+        disabled: props.readonly || !replaceableVariables.value.length,
+        children: replaceableVariables.value.map(variable => ({
+          label: variable.name,
+          key: `replace:${variable.name}`,
+        })),
+      },
+      {
+        label: t('promptEditor.contextDeleteVariable'),
+        key: 'delete-variable',
+        disabled: props.readonly,
+      },
+    ]
+  }
+  return [
+  {
+    label: t('promptEditor.contextCreateVariable'),
+    key: 'create-variable',
+    disabled: props.readonly || !contextSelectedText.value.trim(),
+  },
+  {
+    label: t('promptEditor.insertVariable'),
+    key: 'insert-variable',
+    disabled: props.readonly
+      || (!insertablePromptVariables.value.length && !insertableLibraryVariables.value.length),
+    children: [
+      ...(insertablePromptVariables.value.length ? [{
+        type: 'group' as const,
+        label: t('promptEditor.groupPromptVariables'),
+        key: 'group-prompt',
+        children: insertablePromptVariables.value.map(variable => ({
+          label: variable.name,
+          key: `insert:${variable.name}`,
+        })),
+      }] : []),
+      ...(insertableLibraryVariables.value.length ? [{
+        type: 'group' as const,
+        label: t('promptEditor.groupLibraryVariables'),
+        key: 'group-library',
+        children: insertableLibraryVariables.value.map(variable => ({
+          label: variable.name,
+          key: `insert:${variable.name}`,
+        })),
+      }] : []),
+    ],
+  },
+  ]
+})
+
+const closeContextMenu = () => {
+  contextMenu.show = false
+}
+
+const handleContextMenuSelect = (key: string) => {
+  contextMenu.show = false
+  if (key === 'create-variable') {
+    openCreateVariableModal()
+  } else if (key === 'delete-variable' && contextVariable.value) {
+    deleteVariableRange(contextVariable.value)
+  } else if (key.startsWith('replace:') && contextVariable.value) {
+    insertVariableInRange(key.slice('replace:'.length), contextVariable.value, false)
+  } else if (key.startsWith('insert:')) {
+    insertVariableInRange(key.slice('insert:'.length), contextRange.value)
+  }
+}
+
+/** 删除变量占位符（移除整个 {{name}}） */
+const deleteVariableRange = (target: { from: number; to: number; name: string }) => {
+  if (!editorView || props.readonly) return
+  editorView.dispatch({
+    changes: { from: target.from, to: target.to },
+    selection: EditorSelection.cursor(target.from),
+    scrollIntoView: true,
+  })
+  editorView.focus()
+}
+
+const sanitizeVariableName = (raw: string) => raw.trim()
+  .replace(/[{}\r\n]+/g, '')
+  .replace(/\s+/g, '-')
+  .slice(0, 40)
+
+const openCreateVariableModal = () => {
+  createModal.name = sanitizeVariableName(contextSelectedText.value)
+    || t('promptEditor.defaultVariableName', { index: 1 })
+  createModal.type = 'text'
+  createModal.error = ''
+  createModal.show = true
+}
+
+const createVariableErrorText = computed(() => {
+  if (createModal.error === 'required') return t('promptEditor.variableNameRequired')
+  if (createModal.error === 'invalid') return t('promptEditor.variableNameInvalid')
+  if (createModal.error === 'duplicate') return t('promptEditor.variableNameDuplicate')
+  return ''
+})
+
+const createTypeOptions = computed(() => [
+  { label: t('promptEditor.typeText'), value: 'text' },
+  { label: t('promptEditor.typeTextarea'), value: 'textarea' },
+  { label: t('promptEditor.typeSelect'), value: 'select' },
+  { label: t('promptEditor.typeNumber'), value: 'number' },
+  { label: t('promptEditor.typeBoolean'), value: 'boolean' },
+])
+
+const confirmCreateVariable = () => {
+  const name = createModal.name.trim()
+  const error = validateVariableName(name, props.variables)
+  if (error) {
+    createModal.error = error
+    return
+  }
+  createModal.show = false
+  insertVariableInRange(name, contextRange.value)
+  emit('variable-created', { ...createVariable(name), type: createModal.type })
 }
 
 const focusVariable = (name: string, occurrence = 0) => {
@@ -323,7 +544,7 @@ defineExpose({
 </script>
 
 <style scoped>
-.structured-editor { container: structured-editor / inline-size; box-sizing: border-box; min-height: 0; height: 100%; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-primary); }
+.structured-editor { container: structured-editor / inline-size; box-sizing: border-box; min-height: 0; height: 100%; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-primary); font-family: var(--font-prompt); }
 .structured-editor-toolbar { min-height: 46px; padding: 6px var(--compact-padding); display: flex; align-items: center; justify-content: space-between; gap: var(--compact-padding); border: 0; border-bottom: 1px solid var(--border-default); border-radius: 0; }
 .editor-view-switch, .editor-toolbar-actions { min-width: 0; display: flex; align-items: center; gap: 4px; }
 .editor-view-switch { flex: 0 1 auto; }
@@ -344,6 +565,12 @@ defineExpose({
 .structured-editor-host :deep(.prompt-variable-source.selected) { background: var(--interactive-active); font-weight: var(--font-weight-medium); }
 .structured-editor-host :deep(.prompt-variable-diagnostic) { text-decoration: underline wavy var(--accent-warning); text-underline-offset: 3px; }
 .editor-diagnostic { min-height: 32px; padding: 6px var(--compact-padding); display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--border-default); color: var(--accent-warning); background: var(--surface-secondary); font-size: 12px; }
+.create-variable-modal { box-sizing: border-box; width: 360px; padding: var(--content-padding); border: 1px solid var(--border-default); border-radius: var(--radius-panel); background: var(--surface-primary); }
+.create-variable-hint { margin: 4px 0 var(--content-padding); color: var(--content-secondary); font-size: 12px; }
+.create-variable-field { margin-bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
+.create-variable-label { color: var(--content-secondary); font-size: 13px; font-weight: var(--font-weight-medium); }
+.create-variable-error { margin: 0; color: var(--accent-error); font-size: 12px; }
+.create-variable-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: var(--content-padding); }
 @container structured-editor (max-width: 680px) {
   .variable-count { display: none; }
   .structured-editor-toolbar { padding-inline: 8px; gap: 4px; }

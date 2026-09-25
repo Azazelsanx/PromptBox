@@ -18,8 +18,8 @@ export class OpenRouterProvider extends BaseAIProvider {
   private getDefaultHeaders(): Record<string, string> {
     return {
       'HTTP-Referer': 'https://getaigist.com',
-      'X-OpenRouter-Title': 'AI Gist',
-      'X-Title': 'AI Gist'
+      'X-OpenRouter-Title': 'PromptBox',
+      'X-Title': 'PromptBox'
     };
   }
 
